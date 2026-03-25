@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto  = require('crypto');
+const bcrypt  = require('bcryptjs');
 const { getUsers, getPermissions, getProjects, getHubs, saveHubs, appendAuditEntry } = require('../db');
 
 const router = express.Router();
@@ -27,17 +28,29 @@ function generateSlug(title) {
   return `${base}-${suffix}`;
 }
 
+// Strip password hashes from hub before sending to frontend
+function sanitizeHub(hub) {
+  if (!hub) return hub;
+  return {
+    ...hub,
+    accessList: (hub.accessList || []).map(a => {
+      const { passwordHash, ...rest } = a;
+      return { ...rest, hasPassword: !!passwordHash };
+    }),
+  };
+}
+
 // ── GET /api/resource-hub ──────────────────────────────────────
 // Return all hubs (any authenticated user — used for admin overview)
 router.get('/', requireAuth, (req, res) => {
-  res.json(getHubs());
+  res.json(getHubs().map(sanitizeHub));
 });
 
 // ── GET /api/resource-hub/project/:projectId ──────────────────
 // Check if a hub exists for a given project (any authenticated user)
 router.get('/project/:projectId', requireAuth, (req, res) => {
   const hub = getHubs().find(h => h.projectId === req.params.projectId);
-  res.json(hub || null);
+  res.json(hub ? sanitizeHub(hub) : null);
 });
 
 // ── GET /api/resource-hub/:id ──────────────────────────────────
@@ -45,7 +58,7 @@ router.get('/project/:projectId', requireAuth, (req, res) => {
 router.get('/:id', requireAuth, (req, res) => {
   const hub = getHubs().find(h => h.id === req.params.id);
   if (!hub) return res.status(404).json({ error: 'Hub not found.' });
-  res.json(hub);
+  res.json(sanitizeHub(hub));
 });
 
 // ── POST /api/resource-hub ─────────────────────────────────────
@@ -79,6 +92,21 @@ router.post('/', requireAuth, (req, res) => {
       addedAt:     new Date().toISOString(),
     }));
 
+  // Auto-add the PM who generated the hub (if they have an email)
+  if (actor?.email && actor.email.trim()) {
+    const pmEmail = actor.email.trim().toLowerCase();
+    if (!accessList.find(a => a.email === pmEmail)) {
+      accessList.unshift({
+        contactId:   actor.id,
+        name:        actor.name,
+        email:       pmEmail,
+        accessLevel: 'full',
+        addedAt:     new Date().toISOString(),
+        isPM:        true,
+      });
+    }
+  }
+
   const hub = {
     id:           genId(),
     slug:         generateSlug(project.title),
@@ -108,6 +136,7 @@ router.post('/', requireAuth, (req, res) => {
     ticketingNote: '',
     accessList,
     recordings:    [],
+    accessLog:     [],
   };
 
   const list = getHubs();
@@ -125,7 +154,7 @@ router.post('/', requireAuth, (req, res) => {
     meta:      { projectId, slug: hub.slug },
   });
 
-  res.json(hub);
+  res.json(sanitizeHub(hub));
 });
 
 // ── PUT /api/resource-hub/:id ──────────────────────────────────
@@ -139,9 +168,21 @@ router.put('/:id', requireAuth, (req, res) => {
   const idx  = list.findIndex(h => h.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Hub not found.' });
 
-  const allowed = ['isPublic', 'sections', 'limitedSections', 'accessList', 'recordings', 'ticketingUrl', 'ticketingNote'];
+  const allowed = ['isPublic', 'sections', 'limitedSections', 'recordings', 'ticketingUrl', 'ticketingNote'];
   for (const key of allowed) {
     if (req.body[key] !== undefined) list[idx][key] = req.body[key];
+  }
+
+  // Handle accessList separately — preserve existing passwordHash values
+  if (req.body.accessList !== undefined) {
+    const existingList = list[idx].accessList || [];
+    list[idx].accessList = req.body.accessList.map(newEntry => {
+      const existing = existingList.find(e => e.email.toLowerCase() === newEntry.email.toLowerCase());
+      return {
+        ...newEntry,
+        ...(existing?.passwordHash ? { passwordHash: existing.passwordHash } : {}),
+      };
+    });
   }
   list[idx].updatedAt = new Date().toISOString();
 
@@ -159,7 +200,7 @@ router.put('/:id', requireAuth, (req, res) => {
     meta:      { hubId: req.params.id },
   });
 
-  res.json(list[idx]);
+  res.json(sanitizeHub(list[idx]));
 });
 
 // ── DELETE /api/resource-hub/:id ───────────────────────────────
@@ -186,6 +227,48 @@ router.delete('/:id', requireAuth, (req, res) => {
     action:    'resource_hub.deleted',
     details:   `Resource hub deleted for project: ${removed.projectTitle}`,
     meta:      { hubId: req.params.id, slug: removed.slug },
+  });
+
+  res.json({ ok: true });
+});
+
+// ── POST /api/resource-hub/:id/set-password ────────────────────
+// Set or reset password for a contact in the access list
+router.post('/:id/set-password', requireAuth, (req, res) => {
+  if (!canUser(req.session.userId, 'generate_resource_hub')) {
+    return res.status(403).json({ error: 'Permission denied.' });
+  }
+
+  const { email, password } = req.body;
+  if (!email) return res.status(400).json({ error: 'email is required.' });
+
+  const list = getHubs();
+  const idx  = list.findIndex(h => h.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Hub not found.' });
+
+  const entry = list[idx].accessList.find(a => a.email.toLowerCase() === email.trim().toLowerCase());
+  if (!entry) return res.status(404).json({ error: 'Contact not found in access list.' });
+
+  if (!password || password.trim() === '') {
+    // Clear password
+    delete entry.passwordHash;
+  } else {
+    entry.passwordHash = bcrypt.hashSync(password.trim(), 10);
+  }
+
+  list[idx].updatedAt = new Date().toISOString();
+  saveHubs(list);
+
+  const actor = getUsers().find(u => u.id === req.session.userId);
+  appendAuditEntry({
+    id:        genId(),
+    timestamp: new Date().toISOString(),
+    userId:    actor?.id || 'unknown',
+    userName:  actor?.name || 'Unknown',
+    userRole:  actor?.role || 'unknown',
+    action:    'resource_hub.password_set',
+    details:   `Password ${password ? 'set' : 'cleared'} for ${email} in hub: ${list[idx].projectTitle}`,
+    meta:      { hubId: req.params.id, email },
   });
 
   res.json({ ok: true });

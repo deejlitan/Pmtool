@@ -6,7 +6,8 @@
  */
 
 const express = require('express');
-const { getHubs, getProjects, getUsers } = require('../db');
+const bcrypt  = require('bcryptjs');
+const { getHubs, saveHubs, getProjects, getUsers } = require('../db');
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ function progressBar(pct) {
 }
 
 // ── Gate HTML ──────────────────────────────────────────────────
-function buildGateHtml(hub) {
+function buildGateHtml(hub, errorMsg) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,8 +69,8 @@ function buildGateHtml(hub) {
     .gate-btn{width:100%;padding:13px;background:#092903;color:#32CE13;border:none;border-radius:10px;font-family:'Fira Sans',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;transition:background .2s}
     .gate-btn:hover{background:#1a6b08}
     .gate-btn:disabled{opacity:.6;cursor:not-allowed}
-    .gate-error{display:none;color:#dc3545;font-size:.85rem;margin-top:10px;padding:10px 14px;background:#fff5f5;border:1px solid #f5c2c7;border-radius:8px}
-    .gate-error.show{display:block}
+    .gate-error{color:#dc3545;font-size:.85rem;margin-top:10px;padding:10px 14px;background:#fff5f5;border:1px solid #f5c2c7;border-radius:8px;${errorMsg?'':'display:none'}}
+    .gate-hint{font-size:.75rem;color:#8aaa8a;margin-top:6px;margin-bottom:18px}
     footer{text-align:center;padding:20px;font-size:.78rem;color:#8aaa8a;border-top:1px solid #d4e8d0}
     .footer-brand{color:#32CE13;font-family:'Fira Sans',sans-serif;font-weight:800}
   </style>
@@ -86,10 +87,13 @@ function buildGateHtml(hub) {
   <div class="gate-box">
     <div class="gate-icon">🔒</div>
     <h2>${escHtml(hub.projectTitle)}</h2>
-    <p>This resource hub is private. Enter your email address to verify access.</p>
+    <p>This resource hub is private. Enter your credentials to verify access.</p>
+    <label class="gate-label" for="gateEmail">Email Address</label>
     <input class="gate-input" type="email" id="gateEmail" placeholder="your@email.com" />
+    <label class="gate-label" for="gatePassword">Password <span style="font-weight:400;color:#8aaa8a">(if provided by your project team)</span></label>
+    <input class="gate-input" type="password" id="gatePassword" placeholder="Leave blank if no password was set" />
     <button class="gate-btn" id="gateBtn" onclick="verifyAccess()">Access Resource Hub →</button>
-    <div class="gate-error" id="gateError"></div>
+    <div class="gate-error" id="gateError">${errorMsg ? escHtml(errorMsg) : ''}</div>
   </div>
 </div>
 
@@ -98,31 +102,35 @@ function buildGateHtml(hub) {
 </footer>
 
 <script>
+  document.getElementById('gatePassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') verifyAccess();
+  });
   document.getElementById('gateEmail').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') verifyAccess();
   });
 
   function verifyAccess() {
-    const email = document.getElementById('gateEmail').value.trim();
-    const errEl = document.getElementById('gateError');
-    const btn   = document.getElementById('gateBtn');
+    const email    = document.getElementById('gateEmail').value.trim();
+    const password = document.getElementById('gatePassword').value;
+    const errEl    = document.getElementById('gateError');
+    const btn      = document.getElementById('gateBtn');
     if (!email) { showError('Please enter your email address.'); return; }
 
     btn.disabled = true;
     btn.textContent = 'Verifying…';
-    errEl.classList.remove('show');
+    errEl.style.display = 'none';
 
     fetch(window.location.pathname + '/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, password }),
     })
     .then(r => r.json())
     .then(data => {
       if (data.ok) {
         window.location.reload();
       } else {
-        showError(data.error || 'This email is not authorized. Please contact your Sprout Solutions project team.');
+        showError(data.error || 'Access denied. Please contact your Sprout Solutions project team.');
         btn.disabled = false;
         btn.textContent = 'Access Resource Hub →';
       }
@@ -137,7 +145,7 @@ function buildGateHtml(hub) {
   function showError(msg) {
     const el = document.getElementById('gateError');
     el.textContent = msg;
-    el.classList.add('show');
+    el.style.display = 'block';
   }
 </script>
 </body>
@@ -218,8 +226,9 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
 
   // Internal-user admin banner
   const adminBanner = isInternalUser ? `
-    <div class="internal-banner">
-      🔒 <strong>Internal View</strong> — You are viewing this as a logged-in Sprout team member. Clients see only the sections you have enabled.
+    <div class="internal-banner" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+      <span>🔒 <strong>Internal View</strong> — You are viewing this as a logged-in Sprout team member. Clients see only the sections you have enabled.</span>
+      <a href="/hub/${escHtml(hub.slug)}/logout" style="font-size:.8rem;font-weight:700;color:#092903;background:#d2f96d;border:1px solid #a3d900;border-radius:8px;padding:5px 14px;text-decoration:none;white-space:nowrap;flex-shrink:0">🚪 Test Client View</a>
     </div>` : '';
 
   // ── Section: Milestones ──
@@ -504,6 +513,7 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
     ${pm ? `<span>PM: ${escHtml(pm.name)}</span>` : ''}
     <span>${fmtDate(new Date().toISOString())}</span>
     <span class="header-badge">${progress}% Complete</span>
+    ${!isInternalUser ? `<a href="/hub/${escHtml(hub.slug)}/logout" style="font-size:.72rem;color:rgba(255,255,255,.65);text-decoration:underline;margin-top:2px">Sign out</a>` : ''}
   </div>
 </header>
 
@@ -567,8 +577,8 @@ router.get('/:slug', (req, res) => {
 
   if (!hub) return res.status(404).send(build404Html());
 
-  // Internal PMT users get full bypass
-  if (req.session.userId) {
+  // Internal PMT users get full bypass — unless they clicked "Test Client View"
+  if (req.session.userId && !req.session.hubForceGate?.[slug]) {
     const project = getProjects().find(p => p.id === hub.projectId);
     return res.send(buildHubHtml(hub, project, 'full', true));
   }
@@ -585,25 +595,82 @@ router.get('/:slug', (req, res) => {
   return res.send(buildHubHtml(hub, project, access.accessLevel, false));
 });
 
+// ── GET /hub/:slug/logout ──────────────────────────────────────
+// Clears hub session. For PMT users, also forces them through the gate on next visit.
+router.get('/:slug/logout', (req, res) => {
+  const { slug } = req.params;
+
+  // Clear hub access session for this slug
+  if (req.session.hubAccess) delete req.session.hubAccess[slug];
+
+  // For internal PMT users: set a flag so the gate is shown on next visit
+  if (req.session.userId) {
+    if (!req.session.hubForceGate) req.session.hubForceGate = {};
+    req.session.hubForceGate[slug] = true;
+  }
+
+  res.redirect(`/hub/${slug}`);
+});
+
 // ── POST /hub/:slug/verify ─────────────────────────────────────
 router.post('/:slug/verify', (req, res) => {
-  const { slug }  = req.params;
-  const { email } = req.body;
+  const { slug }     = req.params;
+  const { email, password } = req.body;
 
   if (!email || typeof email !== 'string') {
     return res.json({ ok: false, error: 'Email is required.' });
   }
 
-  const hub = getHubs().find(h => h.slug === slug);
-  if (!hub) return res.json({ ok: false, error: 'Hub not found.' });
+  const hubs = getHubs();
+  const hubIdx = hubs.findIndex(h => h.slug === slug);
+  if (hubIdx === -1) return res.json({ ok: false, error: 'Hub not found.' });
+
+  const hub = hubs[hubIdx];
   if (!hub.isPublic) return res.json({ ok: false, error: 'This hub is not currently available.' });
 
   const normalized = email.trim().toLowerCase();
   const entry      = hub.accessList.find(a => a.email.toLowerCase() === normalized);
 
+  // Log this attempt
+  const logEntry = {
+    email:     normalized,
+    timestamp: new Date().toISOString(),
+    ip:        req.ip || req.connection?.remoteAddress || 'unknown',
+    success:   false,
+  };
+
   if (!entry) {
+    logEntry.reason = 'email_not_found';
+    if (!hubs[hubIdx].accessLog) hubs[hubIdx].accessLog = [];
+    hubs[hubIdx].accessLog.unshift(logEntry);
+    if (hubs[hubIdx].accessLog.length > 100) hubs[hubIdx].accessLog.splice(100);
+    saveHubs(hubs);
     return res.json({ ok: false, error: 'This email is not authorized. Please contact your Sprout Solutions project team.' });
   }
+
+  // Check password if one is set
+  if (entry.passwordHash) {
+    const pw = (password || '').trim();
+    if (!pw || !bcrypt.compareSync(pw, entry.passwordHash)) {
+      logEntry.reason = 'wrong_password';
+      if (!hubs[hubIdx].accessLog) hubs[hubIdx].accessLog = [];
+      hubs[hubIdx].accessLog.unshift(logEntry);
+      if (hubs[hubIdx].accessLog.length > 100) hubs[hubIdx].accessLog.splice(100);
+      saveHubs(hubs);
+      return res.json({ ok: false, error: 'Incorrect password. Please try again or contact your project team.' });
+    }
+  }
+
+  // Success
+  logEntry.success = true;
+  logEntry.reason  = 'ok';
+  if (!hubs[hubIdx].accessLog) hubs[hubIdx].accessLog = [];
+  hubs[hubIdx].accessLog.unshift(logEntry);
+  if (hubs[hubIdx].accessLog.length > 100) hubs[hubIdx].accessLog.splice(100);
+
+  // Update lastAccess on entry
+  entry.lastAccess = new Date().toISOString();
+  saveHubs(hubs);
 
   if (!req.session.hubAccess) req.session.hubAccess = {};
   req.session.hubAccess[slug] = {
@@ -611,6 +678,9 @@ router.post('/:slug/verify', (req, res) => {
     accessLevel: entry.accessLevel,
     expiresAt:   Date.now() + HUB_SESSION_TTL,
   };
+
+  // Clear force-gate flag now that user has verified
+  if (req.session.hubForceGate) delete req.session.hubForceGate[slug];
 
   res.json({ ok: true, accessLevel: entry.accessLevel });
 });

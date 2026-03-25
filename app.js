@@ -4122,11 +4122,13 @@ async function openResourceHubModal(projectId) {
                 <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;border:1px solid var(--border);border-radius:9px;background:var(--surface)">
                   <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#8139EE,#32CE13);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${(a.name||a.email||'?')[0].toUpperCase()}</div>
                   <div style="flex:1;min-width:0">
-                    ${a.name?`<div style="font-size:.83rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.name}</div>`:''}
+                    ${a.name?`<div style="font-size:.83rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.name}${a.isPM?` <span style="font-size:.68rem;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:10px;font-weight:700">PM</span>`:''}</div>`:''}
                     <div style="font-size:.74rem;color:var(--txt-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.email}</div>
+                    <div style="font-size:.7rem;margin-top:1px">${a.hasPassword?'<span style="color:#059669">🔒 Password set</span>':'<span style="color:#d97706">⚠️ No password set</span>'}</div>
                   </div>
                   ${!isReadOnly
-    ? `<select class="rh-ac-level-select" data-idx="${i}" style="padding:.28rem .5rem;border:1.5px solid var(--border);border-radius:6px;font-size:.78rem;outline:none">
+    ? `<button class="btn btn-ghost btn-sm rh-set-pw-btn" data-idx="${i}" data-email="${a.email}" title="${a.hasPassword?'Reset password':'Set password'}" style="font-size:.72rem;padding:.2rem .45rem;white-space:nowrap">${a.hasPassword?'🔑 Reset':'🔑 Set PW'}</button>
+                    <select class="rh-ac-level-select" data-idx="${i}" style="padding:.28rem .5rem;border:1.5px solid var(--border);border-radius:6px;font-size:.78rem;outline:none">
                       <option value="full" ${a.accessLevel==='full'?'selected':''}>Full</option>
                       <option value="limited" ${a.accessLevel==='limited'?'selected':''}>Limited</option>
                     </select>
@@ -4135,6 +4137,23 @@ async function openResourceHubModal(projectId) {
                 </div>`).join('')}
         </div>
         ${!isReadOnly?`<div class="modal-actions" style="margin-top:.8rem"><button class="btn btn-ghost rh-close-btn">Close</button><button class="btn btn-primary" id="rh-save-access-btn">Save Access List</button></div>`:'<div class="modal-actions" style="margin-top:.8rem"><button class="btn btn-ghost rh-close-btn">Close</button></div>'}
+
+        ${(hub.accessLog && hub.accessLog.length > 0) ? `
+        <div style="margin-top:1.2rem">
+          <div style="font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);margin-bottom:.5rem">
+            Access Log <span style="font-weight:400;text-transform:none">(last ${Math.min(hub.accessLog.length,20)})</span>
+            ${hub.accessLog.some(l=>!l.success)?'<span style="margin-left:.5rem;font-size:.72rem;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:10px;font-weight:700">⚠ Failed attempts detected</span>':''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.25rem;max-height:180px;overflow-y:auto;font-size:.74rem">
+            ${hub.accessLog.slice(0,20).map(l=>`
+              <div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .55rem;border-radius:6px;background:${l.success?'var(--bg)':'#fef2f2'};border:1px solid ${l.success?'var(--border)':'#fecaca'}">
+                <span>${l.success?'✅':'❌'}</span>
+                <span style="flex:1;color:var(--txt)">${l.email}</span>
+                <span style="color:var(--txt-muted)">${new Date(l.timestamp).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+                ${!l.success?`<span style="color:#dc2626;font-size:.7rem">${l.reason==='wrong_password'?'Wrong password':'Not authorized'}</span>`:''}
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
       </div>`;
 
     // ── Tab: Recordings ──
@@ -4275,6 +4294,33 @@ async function openResourceHubModal(projectId) {
       const r = await fetch(`/api/resource-hub/${hub.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ accessList: hub.accessList }) });
       hub = await r.json();
       m.remove(); buildHubModal('access');
+    });
+
+    // Set / Reset password for a contact
+    m.querySelectorAll('.rh-set-pw-btn').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const email = btn.dataset.email;
+        const idx   = parseInt(btn.dataset.idx);
+        const entry = hub.accessList[idx];
+        const hasExisting = entry.hasPassword;
+        const pw = prompt(
+          `${hasExisting ? 'Reset' : 'Set'} password for ${entry.name || email}:\n\nLeave blank to remove the password.`
+        );
+        if (pw === null) return; // cancelled
+        const r = await fetch(`/api/resource-hub/${hub.id}/set-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pw.trim() }),
+        });
+        if (r.ok) {
+          const updated = await fetch(`/api/resource-hub/${hub.id}`);
+          hub = await updated.json();
+          m.remove();
+          buildHubModal('access');
+        } else {
+          alert('Failed to set password. Please try again.');
+        }
+      });
     });
 
     // Access level change
