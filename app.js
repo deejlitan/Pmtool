@@ -1122,6 +1122,9 @@ async function navigate(page) {
     // Attach announcement dismiss handlers
     attachAnnouncementDismiss(container);
 
+    // PM project table (project_manager role only)
+    if (effectiveUser().role === 'project_manager') renderPMProjectTable();
+
     // Daily briefing for non-admin users
     const myBriefingTarget = document.querySelector('#page-container .page-header');
     if (myBriefingTarget) {
@@ -2659,13 +2662,14 @@ function userRows(users, projects) {
 
 // ── USER DASHBOARD ────────────────────────────────────────────
 function renderUserDashboard() {
-  const all          = getProjects();
-  const mine         = all.filter(p => isMyProject(p, effectiveUser()));
-  const ongoing      = mine.filter(p => p.status === 'ongoing').length;
-  const completed    = mine.filter(p => p.status === 'completed').length;
-  const onHold       = mine.filter(p => p.status === 'on-hold').length;
-  const onHoldSales  = mine.filter(p => p.status === 'on-hold-sales').length;
-  const churn        = mine.filter(p => p.status === 'churn').length;
+  const all   = getProjects();
+  const mine  = all.filter(p => isMyProject(p, effectiveUser()));
+
+  // Ongoing = matches My Projects default filter (Customer Onboarding HubSpot + all internal)
+  const ongoing     = mine.filter(p => p.status === 'ongoing' && (p.createdBy !== 'hubspot' || p.hubspotStage === 'Customer Onboarding')).length;
+  const onHold      = mine.filter(p => p.status === 'on-hold').length;
+  const onHoldSales = mine.filter(p => p.status === 'on-hold-sales').length;
+  const churn       = mine.filter(p => p.status === 'churn').length;
 
   return `
     <div class="page-header">
@@ -2679,17 +2683,9 @@ function renderUserDashboard() {
     ${announcementBannerHtml()}
 
     <div class="stats-grid">
-      <div class="stat-card" style="border-bottom-color:#092903">
-        <div class="stat-icon" style="background:#092903;color:#32CE13">&#128193;</div>
-        <div><div class="stat-label">My Projects</div><div class="stat-value">${mine.length}</div></div>
-      </div>
       <div class="stat-card" style="border-bottom-color:#32CE13">
         <div class="stat-icon" style="background:#E1F6CB;color:#092903">&#9889;</div>
         <div><div class="stat-label">Ongoing</div><div class="stat-value">${ongoing}</div></div>
-      </div>
-      <div class="stat-card" style="border-bottom-color:#1679FA">
-        <div class="stat-icon" style="background:#dbeafe;color:#1679FA">&#127881;</div>
-        <div><div class="stat-label">Completed</div><div class="stat-value">${completed}</div></div>
       </div>
       <div class="stat-card" style="border-bottom-color:#FF7F00">
         <div class="stat-icon" style="background:#ffe8cc;color:#FF7F00">&#9208;</div>
@@ -2706,7 +2702,204 @@ function renderUserDashboard() {
     </div>
 
     ${toolsHubHtml()}
+
+    ${effectiveUser().role === 'project_manager' ? `
+    <div id="pm-project-table-wrap" style="margin-top:1.5rem">
+      <div style="padding:1.5rem;text-align:center;color:var(--txt-muted);font-size:.85rem">Loading your Customer Onboarding projects…</div>
+    </div>` : ''}
   `;
+}
+
+async function renderPMProjectTable() {
+  const wrap = document.getElementById('pm-project-table-wrap');
+  if (!wrap) return;
+
+  let allDeals = [];
+  try {
+    const res = await fetch('/api/hubspot/my-deals');
+    if (res.ok) { const data = await res.json(); allDeals = data.deals || []; }
+  } catch {}
+
+  const myDeals = allDeals.filter(d => d.stage === 'Customer Onboarding');
+
+  if (!myDeals.length) {
+    wrap.innerHTML = `<div class="empty-state" style="margin-top:1rem">No Customer Onboarding projects assigned to you.</div>`;
+    return;
+  }
+
+  const pmColFilters = {};
+  const fmtDate = v => v ? new Date(isNaN(v) ? v : Number(v)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  function pmCellVal(col, d) {
+    const val = getDashEffectiveVal(col, d);
+    if (val === '' || val === null || val === undefined) return '—';
+    if (col.type === 'currency') return `₱${Number(val).toLocaleString()}`;
+    if (col.type === 'date')     return fmtDate(val);
+    if (col.type === 'url')      return `<a href="${val}" target="_blank" style="color:var(--primary);text-decoration:none">Open ↗</a>`;
+    return val;
+  }
+
+  const tableHeaders = DASH_COLS.map(c => `
+    <th style="position:sticky;top:0;z-index:2;min-width:${c.minW};padding:0;background:var(--surface);border-bottom:2px solid var(--border)">
+      <div style="display:flex;align-items:center;padding:.4rem .55rem;gap:.2rem">
+        <span style="flex:1;font-size:.71rem;font-weight:600;font-family:var(--font-sub);text-transform:uppercase;letter-spacing:.04em;color:var(--txt-muted);white-space:nowrap">${c.label}</span>
+        <button class="pm-col-filter-btn" data-col="${c.key}" title="Filter" style="background:none;border:none;cursor:pointer;font-size:.6rem;padding:2px 3px;border-radius:3px;line-height:1;flex-shrink:0;color:var(--txt-muted)">&#9660;</button>
+      </div>
+    </th>`).join('');
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-header" style="background:linear-gradient(135deg,#092903 0%,#0d3d05 30%,#1a6b0a 60%,#32CE13 100%);border-bottom:none;padding:1.1rem 1.4rem;position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(50,206,19,.07) 0px,rgba(50,206,19,.07) 1px,transparent 1px,transparent 40px),repeating-linear-gradient(0deg,rgba(50,206,19,.07) 0px,rgba(50,206,19,.07) 1px,transparent 1px,transparent 40px);pointer-events:none"></div>
+        <h3 style="color:#ffffff;font-size:1rem;font-weight:700;font-family:var(--font-sub);letter-spacing:.08em;text-transform:uppercase;text-shadow:0 0 12px rgba(255,255,255,.4),0 0 24px rgba(50,206,19,.3);position:relative;z-index:1">&#9654; My Customer Onboarding Projects</h3>
+      </div>
+      <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.8rem 1.2rem;border-bottom:1px solid var(--border)">
+        <input id="pm-dash-search" type="text" placeholder="Search company…" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt);min-width:180px" />
+        <button id="pm-clear-filters" style="padding:.4rem .9rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-weight:600;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt-muted);cursor:pointer;white-space:nowrap">✕ Clear Filters</button>
+      </div>
+      <div style="overflow:auto;max-height:480px;cursor:grab;user-select:none" id="pm-table-scroller">
+        <table style="white-space:nowrap;min-width:5800px;table-layout:auto;font-size:.73rem;border-collapse:collapse;width:100%">
+          <thead><tr>${tableHeaders}</tr></thead>
+          <tbody id="pm-table-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  function updatePMColFilterBtns() {
+    document.querySelectorAll('.pm-col-filter-btn').forEach(btn => {
+      const active = pmColFilters[btn.dataset.col]?.size > 0;
+      btn.style.color      = active ? 'var(--primary)' : 'var(--txt-muted)';
+      btn.style.fontWeight = active ? '700' : '';
+    });
+  }
+
+  function renderPMRows() {
+    const search   = document.getElementById('pm-dash-search')?.value.toLowerCase() || '';
+    const filtered = myDeals.filter(d => {
+      if (search && !d.name.toLowerCase().includes(search)) return false;
+      return DASH_COLS.every(col => {
+        const sel = pmColFilters[col.key];
+        if (!sel || sel.size === 0) return true;
+        return sel.has(String(getDashEffectiveVal(col, d) ?? ''));
+      });
+    });
+    const tbody = document.getElementById('pm-table-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = filtered.length
+      ? filtered.map(d => `<tr>${DASH_COLS.map(col => `<td style="padding:.45rem .6rem;border-bottom:1px solid var(--border);white-space:nowrap;font-size:.73rem;max-width:220px;overflow:hidden;text-overflow:ellipsis">${pmCellVal(col, d)}</td>`).join('')}</tr>`).join('')
+      : `<tr><td colspan="${DASH_COLS.length}" class="empty-state">No results found.</td></tr>`;
+    updatePMColFilterBtns();
+  }
+
+  renderPMRows();
+
+  document.getElementById('pm-dash-search').addEventListener('input', renderPMRows);
+
+  document.getElementById('pm-clear-filters').addEventListener('click', () => {
+    document.getElementById('pm-dash-search').value = '';
+    Object.keys(pmColFilters).forEach(k => delete pmColFilters[k]);
+    closePMFilterPopup();
+    renderPMRows();
+  });
+
+  // ── Column filter popup ───────────────────────────────────────
+  let activePMColKey = null;
+
+  function closePMFilterPopup() {
+    const existing = document.getElementById('col-filter-popup');
+    if (existing) existing.remove();
+    activePMColKey = null;
+  }
+
+  function openPMFilterPopup(btn, colKey) {
+    if (activePMColKey === colKey) { closePMFilterPopup(); return; }
+    closePMFilterPopup();
+    const col = DASH_COLS.find(c => c.key === colKey);
+    if (!col) return;
+    activePMColKey = colKey;
+
+    const search = document.getElementById('pm-dash-search')?.value.toLowerCase() || '';
+    const otherDeals = myDeals.filter(d => {
+      if (search && !d.name.toLowerCase().includes(search)) return false;
+      return DASH_COLS.every(c => {
+        if (c.key === colKey) return true;
+        const sel = pmColFilters[c.key];
+        if (!sel || sel.size === 0) return true;
+        return sel.has(String(getDashEffectiveVal(c, d) ?? ''));
+      });
+    });
+
+    const allValues = [...new Set(otherDeals.map(d => String(getDashEffectiveVal(col, d) ?? '')).filter(v => v))].sort();
+    const selected  = pmColFilters[colKey] || new Set();
+
+    const popup = document.createElement('div');
+    popup.id = 'col-filter-popup';
+    popup.style.cssText = 'position:fixed;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);min-width:220px;padding:.4rem 0;font-family:Rubik,sans-serif';
+    popup.innerHTML = `
+      <div style="padding:.35rem .7rem .3rem;border-bottom:1px solid var(--border)">
+        <div style="font-size:.72rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem">${col.label}</div>
+        <input id="cfd-search" placeholder="Search values…" autocomplete="off" style="width:100%;box-sizing:border-box;padding:.28rem .5rem;border:1px solid var(--border);border-radius:5px;font-size:.78rem;background:var(--bg);color:var(--txt);font-family:Rubik,sans-serif">
+      </div>
+      <div style="padding:.25rem .7rem;display:flex;align-items:center;border-bottom:1px solid var(--border)">
+        <label style="font-size:.75rem;color:var(--txt-muted);cursor:pointer;display:flex;align-items:center;gap:.3rem;user-select:none">
+          <input type="checkbox" id="cfd-select-all" style="accent-color:var(--primary)"> Select All
+        </label>
+      </div>
+      <div id="cfd-list" style="max-height:200px;overflow-y:auto;padding:.2rem 0"></div>
+      <div style="padding:.4rem .7rem;border-top:1px solid var(--border);display:flex;gap:.4rem">
+        <button id="cfd-clear" style="flex:1;padding:.3rem;border:1px solid var(--border);border-radius:5px;font-size:.75rem;background:var(--bg);color:var(--txt-muted);cursor:pointer;font-family:Rubik,sans-serif">Clear</button>
+        <button id="cfd-done"  style="flex:1;padding:.3rem;border:none;border-radius:5px;font-size:.75rem;background:var(--primary);color:#fff;cursor:pointer;font-weight:600;font-family:Rubik,sans-serif">Done</button>
+      </div>`;
+    document.body.appendChild(popup);
+
+    function renderList(term = '') {
+      const list = document.getElementById('cfd-list');
+      if (!list) return;
+      const vals = term ? allValues.filter(v => v.toLowerCase().includes(term.toLowerCase())) : allValues;
+      list.innerHTML = vals.length
+        ? vals.map(v => `<label style="display:flex;align-items:center;gap:.5rem;padding:.28rem .7rem;font-size:.78rem;cursor:pointer;white-space:nowrap;user-select:none"><input type="checkbox" class="cfd-cb" value="${v.replace(/"/g,'&quot;')}" ${selected.has(v)?'checked':''} style="accent-color:var(--primary)"><span style="overflow:hidden;text-overflow:ellipsis;max-width:170px" title="${v}">${v}</span></label>`).join('')
+        : `<div style="padding:.4rem .7rem;font-size:.78rem;color:var(--txt-muted);font-style:italic">No values</div>`;
+    }
+    renderList();
+
+    const rect = btn.getBoundingClientRect();
+    popup.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
+    popup.style.top  = (rect.bottom + 4) + 'px';
+
+    const selectAllCb = document.getElementById('cfd-select-all');
+    selectAllCb.checked = selected.size === 0 || selected.size === allValues.length;
+    document.getElementById('cfd-search').addEventListener('input', e => renderList(e.target.value));
+    selectAllCb.addEventListener('change', () => { document.querySelectorAll('#cfd-list .cfd-cb').forEach(cb => { cb.checked = selectAllCb.checked; }); });
+    document.getElementById('cfd-list').addEventListener('change', () => { selectAllCb.checked = document.querySelectorAll('#cfd-list .cfd-cb:checked').length === allValues.length; });
+    document.getElementById('cfd-clear').addEventListener('click', () => { delete pmColFilters[colKey]; closePMFilterPopup(); renderPMRows(); });
+    document.getElementById('cfd-done').addEventListener('click', () => {
+      const checked = [...document.querySelectorAll('#cfd-list .cfd-cb:checked')].map(cb => cb.value);
+      if (!checked.length || checked.length === allValues.length) delete pmColFilters[colKey];
+      else pmColFilters[colKey] = new Set(checked);
+      closePMFilterPopup();
+      renderPMRows();
+    });
+    popup.addEventListener('click', e => e.stopPropagation());
+  }
+
+  document.querySelector('#pm-table-scroller thead').addEventListener('click', e => {
+    const btn = e.target.closest('.pm-col-filter-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    openPMFilterPopup(btn, btn.dataset.col);
+  });
+  document.addEventListener('click', closePMFilterPopup);
+
+  // Drag-to-scroll
+  const scroller = document.getElementById('pm-table-scroller');
+  if (scroller) {
+    let isDown = false, startX, startY, scrollLeft, scrollTop;
+    scroller.addEventListener('mousedown', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return; isDown = true; startX = e.pageX - scroller.offsetLeft; scrollLeft = scroller.scrollLeft; startY = e.pageY - scroller.offsetTop; scrollTop = scroller.scrollTop; scroller.style.cursor = 'grabbing'; });
+    scroller.addEventListener('mouseleave', () => { isDown = false; scroller.style.cursor = 'grab'; });
+    scroller.addEventListener('mouseup',    () => { isDown = false; scroller.style.cursor = 'grab'; });
+    scroller.addEventListener('mousemove',  e => { if (!isDown) return; e.preventDefault(); scroller.scrollLeft = scrollLeft - (e.pageX - scroller.offsetLeft - startX); scroller.scrollTop = scrollTop - (e.pageY - scroller.offsetTop - startY); });
+  }
 }
 
 function userProjectCard(p) {

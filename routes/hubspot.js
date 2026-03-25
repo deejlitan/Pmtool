@@ -1,5 +1,5 @@
 const express = require('express');
-const { getUsers, getIntegrations } = require('../db');
+const { getUsers, getIntegrations, getProjects } = require('../db');
 
 const router = express.Router();
 const HS = 'https://api.hubapi.com';
@@ -67,6 +67,29 @@ function buildSearchBody(after) {
     ...(after ? { after } : {}),
   };
 }
+
+/* ── GET /api/hubspot/my-deals ────────────────────────────────
+   Returns only the deals assigned to the requesting PM.
+   Uses the shared cache — no extra HubSpot API calls.
+─────────────────────────────────────────────────────────────── */
+router.get('/my-deals', requireAuth, (req, res) => {
+  if (!dealsCache) return res.json({ deals: [] });
+
+  const user     = getUsers().find(u => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ error: 'Not logged in.' });
+
+  // Find this user's HubSpot project IDs from local projects
+  const projects    = getProjects();
+  const myHsIds     = new Set(
+    projects
+      .filter(p => p.projectManager === user.id || (p.assignedTo || []).includes(user.id))
+      .map(p => String(p.hubspotId))
+      .filter(Boolean)
+  );
+
+  const myDeals = (dealsCache.deals || []).filter(d => myHsIds.has(String(d.id)));
+  res.json({ pipeline: dealsCache.pipeline, deals: myDeals });
+});
 
 /* ── GET /api/hubspot/deals ───────────────────────────────────
    Fetches Company objects where client_stage is
