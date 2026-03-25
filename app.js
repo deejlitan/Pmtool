@@ -1777,35 +1777,16 @@ async function renderAdminDashboard(container, forceRefresh = false) {
     return `<td class="${cls}" data-hsid="${escAttr(d.id)}" data-field="${escAttr(col.key)}" data-col-type="${col.type}" data-edit-val="${escAttr(String(editVal))}">${displayHtml}${resetBtn}</td>`;
   }
 
-  // Build unique option lists for filters
-  const pmNames  = [...new Set(deals.map(d => resolveOwner(d)).filter(Boolean))].sort();
-  const hrsiList = [...new Set(deals.map(d => d.hrImplementer).filter(Boolean))].sort();
-  const psiList  = [...new Set(deals.map(d => d.payrollImplementer).filter(Boolean))].sort();
-  const statuses = [...new Set(deals.map(d => statusLabel(hsStatusToLocal(d.clientStatus, d.stage))).filter(Boolean))].sort();
-  const stages   = [...new Set(deals.map(d => d.stage).filter(Boolean))].sort();
+  const canEdit    = can('edit_dashboard_fields');
+  const colFilters = {}; // col.key → Set of selected values
 
-  const multiSelect = (id, label, opts) => `
-    <div class="ms-wrap" id="${id}-wrap" style="position:relative">
-      <button type="button" class="ms-btn" id="${id}-btn"
-        style="padding:.4rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt);cursor:pointer;display:flex;align-items:center;gap:.4rem;white-space:nowrap;min-width:140px;justify-content:space-between">
-        <span id="${id}-label">All ${label}</span><span style="font-size:.7rem">&#9660;</span>
-      </button>
-      <div id="${id}-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:999;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-lg);min-width:190px;padding:.4rem 0">
-        <div style="max-height:200px;overflow-y:auto">
-          ${opts.map(o => `
-            <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem .8rem;font-size:.82rem;font-family:'Rubik',sans-serif;cursor:pointer;white-space:nowrap">
-              <input type="checkbox" class="ms-cb" data-filter="${id}" value="${o}" style="accent-color:var(--primary)">
-              ${o}
-            </label>`).join('')}
-        </div>
-        <div style="padding:.4rem .8rem;border-top:1px solid var(--border);margin-top:.2rem">
-          <button type="button" class="ms-done btn btn-primary btn-sm" data-filter="${id}" style="width:100%;font-size:.8rem">Done</button>
-        </div>
+  const tableHeaders = DASH_COLS.map(c => `
+    <th style="position:sticky;top:0;z-index:2;min-width:${c.minW};padding:0;background:var(--surface);border-bottom:2px solid var(--border)">
+      <div style="display:flex;align-items:center;padding:.4rem .55rem;gap:.2rem">
+        <span style="flex:1;font-size:.71rem;font-weight:600;font-family:var(--font-sub);text-transform:uppercase;letter-spacing:.04em;color:var(--txt-muted);white-space:nowrap">${c.label}</span>
+        <button class="col-filter-btn" data-col="${c.key}" title="Filter" style="background:none;border:none;cursor:pointer;font-size:.6rem;padding:2px 3px;border-radius:3px;line-height:1;flex-shrink:0;color:var(--txt-muted)">&#9660;</button>
       </div>
-    </div>`;
-
-  const canEdit      = can('edit_dashboard_fields');
-  const tableHeaders = DASH_COLS.map(c => `<th style="position:sticky;top:0;z-index:1;min-width:${c.minW}">${c.label}</th>`).join('');
+    </th>`).join('');
 
   container.innerHTML = `
     <div class="page-header" style="background:linear-gradient(135deg,#092903 0%,#0d3d05 30%,#1a6b0a 60%,#32CE13 100%);border-radius:var(--radius);padding:1.2rem 1.6rem;margin-bottom:1.5rem;position:relative;overflow:hidden">
@@ -1838,11 +1819,6 @@ async function renderAdminDashboard(container, forceRefresh = false) {
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:.6rem;padding:.8rem 1.2rem;border-bottom:1px solid var(--border);align-items:center">
         <input id="dash-search" type="text" placeholder="Search company…" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt);min-width:180px" />
-        ${multiSelect('dash-filter-pm',     'Project Managers', pmNames)}
-        ${multiSelect('dash-filter-hr',     'HRSI',             hrsiList)}
-        ${multiSelect('dash-filter-payroll','PSI',              psiList)}
-        ${multiSelect('dash-filter-status', 'Statuses',         statuses)}
-        ${multiSelect('dash-filter-stage', 'Stages',           stages)}
         <button id="dash-clear-filters" style="padding:.4rem .9rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-weight:600;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt-muted);cursor:pointer;white-space:nowrap">✕ Clear Filters</button>
         ${currentUser.role === 'super_admin' ? `
         <div class="export-wrap" id="dash-export-wrap" style="position:relative;margin-left:auto">
@@ -1924,70 +1900,23 @@ async function renderAdminDashboard(container, forceRefresh = false) {
     });
   }
 
-  const getChecked = id => [...document.querySelectorAll(`.ms-cb[data-filter="${id}"]:checked`)].map(c => c.value);
-
-  const updateLabel = id => {
-    const checked = getChecked(id);
-    const btn     = document.getElementById(`${id}-btn`);
-    const lbl     = document.getElementById(`${id}-label`);
-    if (!lbl) return;
-    const base = btn.dataset.base || '';
-    lbl.textContent = checked.length === 0 ? `All ${base}` : checked.length === 1 ? checked[0] : `${checked.length} selected`;
-  };
-
-  const filterConfig = [
-    { id: 'dash-filter-pm',      fn: d => resolveOwner(d) || '' },
-    { id: 'dash-filter-hr',      fn: d => d.hrImplementer || '' },
-    { id: 'dash-filter-payroll', fn: d => d.payrollImplementer || '' },
-    { id: 'dash-filter-status',  fn: d => statusLabel(hsStatusToLocal(d.clientStatus, d.stage)) },
-    { id: 'dash-filter-stage',   fn: d => d.stage || '' },
-  ];
-
-  function updateFilterOptions() {
-    const search = document.getElementById('dash-search')?.value.toLowerCase() || '';
-    filterConfig.forEach(({ id, fn }) => {
-      const otherFilters = filterConfig.filter(f => f.id !== id);
-      const available = new Set(
-        deals.filter(d => {
-          if (search && !d.name.toLowerCase().includes(search)) return false;
-          return otherFilters.every(f => {
-            const checked = getChecked(f.id);
-            return !checked.length || checked.includes(f.fn(d));
-          });
-        }).map(d => fn(d)).filter(Boolean)
-      );
-      const dropdown = document.getElementById(`${id}-dropdown`);
-      if (!dropdown) return;
-      dropdown.querySelectorAll('.ms-cb').forEach(cb => {
-        const lbl = cb.closest('label');
-        const avail = available.has(cb.value);
-        lbl.style.opacity = avail ? '' : '0.35';
-        lbl.style.pointerEvents = avail ? '' : 'none';
-        cb.disabled = !avail;
-        if (!avail) cb.checked = false;
-      });
-      updateLabel(id);
+  function updateColFilterBtns() {
+    document.querySelectorAll('.col-filter-btn').forEach(btn => {
+      const active = colFilters[btn.dataset.col]?.size > 0;
+      btn.style.color      = active ? 'var(--primary)' : 'var(--txt-muted)';
+      btn.style.fontWeight = active ? '700' : '';
     });
   }
 
   function renderDashboardRows() {
-    const search  = document.getElementById('dash-search').value.toLowerCase();
-    const fPM     = getChecked('dash-filter-pm');
-    const fHR     = getChecked('dash-filter-hr');
-    const fPay    = getChecked('dash-filter-payroll');
-    const fStatus = getChecked('dash-filter-status');
-    const fStage  = getChecked('dash-filter-stage');
-
+    const search = document.getElementById('dash-search')?.value.toLowerCase() || '';
     const filtered = deals.filter(d => {
-      const pm     = resolveOwner(d) || '';
-      const status = statusLabel(hsStatusToLocal(d.clientStatus, d.stage));
-      if (search         && !d.name.toLowerCase().includes(search)) return false;
-      if (fPM.length     && !fPM.includes(pm))                      return false;
-      if (fHR.length     && !fHR.includes(d.hrImplementer))         return false;
-      if (fPay.length    && !fPay.includes(d.payrollImplementer))   return false;
-      if (fStatus.length && !fStatus.includes(status))              return false;
-      if (fStage.length  && !fStage.includes(d.stage))              return false;
-      return true;
+      if (search && !d.name.toLowerCase().includes(search)) return false;
+      return DASH_COLS.every(col => {
+        const sel = colFilters[col.key];
+        if (!sel || sel.size === 0) return true;
+        return sel.has(String(getDashEffectiveVal(col, d) ?? ''));
+      });
     });
 
     // ── Table ──
@@ -1998,14 +1927,14 @@ async function renderAdminDashboard(container, forceRefresh = false) {
         : `<tr><td colspan="${DASH_COLS.length}" class="empty-state">${hsError ? 'Could not load deals.' : 'No results found.'}</td></tr>`;
     }
 
-    // Track filtered data for export (store effective values per column)
+    // Track filtered data for export
     _exportDashboard = filtered.map(d => {
       const row = { _hsId: d.id };
       DASH_COLS.forEach(col => { row[col.key] = getDashEffectiveVal(col, d); });
       return row;
     });
 
-    // ── Stat cards (live filtered) ──
+    // ── Stat cards ──
     const totalMRR    = filtered.reduce((s, d) => s + (Number(d.amount) || 0), 0);
     const filteredPMs = new Set(filtered.map(d => resolveOwner(d)).filter(Boolean)).size;
     const elCompanies = document.getElementById('stat-val-companies');
@@ -2035,7 +1964,7 @@ async function renderAdminDashboard(container, forceRefresh = false) {
     if (Object.keys(byMilestone).length) buildChart('chart-milestone', 'bar', Object.keys(byMilestone), Object.values(byMilestone));
 
     _exportDashboardCharts = { byStatus, byStage: {}, byPM };
-    updateFilterOptions();
+    updateColFilterBtns();
   }
 
   renderDashboardRows();
@@ -2157,62 +2086,136 @@ async function renderAdminDashboard(container, forceRefresh = false) {
   // Search
   document.getElementById('dash-search').addEventListener('input', renderDashboardRows);
 
-  // Multi-select dropdowns
-  const filterIds  = ['dash-filter-pm','dash-filter-hr','dash-filter-payroll','dash-filter-status','dash-filter-stage'];
-  const baseLabels = { 'dash-filter-pm': 'Project Managers', 'dash-filter-hr': 'HRSI', 'dash-filter-payroll': 'PSI', 'dash-filter-status': 'Statuses', 'dash-filter-stage': 'Stages' };
-
-  const closeAllDropdowns = () => filterIds.forEach(id => {
-    const d = document.getElementById(`${id}-dropdown`);
-    if (d) d.style.display = 'none';
-  });
-
-  filterIds.forEach(id => {
-    const btn      = document.getElementById(`${id}-btn`);
-    const dropdown = document.getElementById(`${id}-dropdown`);
-    if (!btn || !dropdown) return;
-    btn.dataset.base = baseLabels[id];
-
-    // Toggle open/close on button click
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const isOpen = dropdown.style.display === 'block';
-      closeAllDropdowns();
-      dropdown.style.display = isOpen ? 'none' : 'block';
-    });
-
-    // Checkbox change — update in background, keep dropdown open
-    dropdown.addEventListener('change', e => {
-      if (e.target.classList.contains('ms-cb')) {
-        updateLabel(id);
-        renderDashboardRows();
-      }
-    });
-
-    // Done button — close dropdown
-    dropdown.querySelector('.ms-done').addEventListener('click', e => {
-      e.stopPropagation();
-      dropdown.style.display = 'none';
-    });
-
-    // Prevent clicks inside dropdown from bubbling to document
-    dropdown.addEventListener('click', e => e.stopPropagation());
-  });
-
   // Clear all filters
   document.getElementById('dash-clear-filters').addEventListener('click', () => {
     document.getElementById('dash-search').value = '';
-    filterIds.forEach(id => {
-      const dropdown = document.getElementById(`${id}-dropdown`);
-      if (!dropdown) return;
-      dropdown.querySelectorAll('.ms-cb').forEach(cb => cb.checked = false);
-      updateLabel(id);
-    });
-    closeAllDropdowns();
+    Object.keys(colFilters).forEach(k => delete colFilters[k]);
+    closeColFilterPopup();
     renderDashboardRows();
   });
 
-  // Close dropdowns when clicking outside
-  document.addEventListener('click', closeAllDropdowns);
+  // ── Column filter popup ───────────────────────────────────────
+  let activeColKey = null;
+
+  function closeColFilterPopup() {
+    const existing = document.getElementById('col-filter-popup');
+    if (existing) existing.remove();
+    activeColKey = null;
+  }
+
+  function openColFilterPopup(btn, colKey) {
+    if (activeColKey === colKey) { closeColFilterPopup(); return; }
+    closeColFilterPopup();
+
+    const col = DASH_COLS.find(c => c.key === colKey);
+    if (!col) return;
+    activeColKey = colKey;
+
+    // Values available given all OTHER column filters + search
+    const search = document.getElementById('dash-search')?.value.toLowerCase() || '';
+    const otherDeals = deals.filter(d => {
+      if (search && !d.name.toLowerCase().includes(search)) return false;
+      return DASH_COLS.every(c => {
+        if (c.key === colKey) return true;
+        const sel = colFilters[c.key];
+        if (!sel || sel.size === 0) return true;
+        return sel.has(String(getDashEffectiveVal(c, d) ?? ''));
+      });
+    });
+
+    const allValues = [...new Set(otherDeals.map(d => String(getDashEffectiveVal(col, d) ?? '')).filter(v => v))].sort();
+    const selected  = colFilters[colKey] || new Set();
+
+    const popup = document.createElement('div');
+    popup.id = 'col-filter-popup';
+    popup.style.cssText = 'position:fixed;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);min-width:220px;padding:.4rem 0;font-family:Rubik,sans-serif';
+
+    popup.innerHTML = `
+      <div style="padding:.35rem .7rem .3rem;border-bottom:1px solid var(--border)">
+        <div style="font-size:.72rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem">${col.label}</div>
+        <input id="cfd-search" placeholder="Search values…" autocomplete="off" style="width:100%;box-sizing:border-box;padding:.28rem .5rem;border:1px solid var(--border);border-radius:5px;font-size:.78rem;background:var(--bg);color:var(--txt);font-family:Rubik,sans-serif">
+      </div>
+      <div style="padding:.25rem .7rem;display:flex;align-items:center;border-bottom:1px solid var(--border)">
+        <label style="font-size:.75rem;color:var(--txt-muted);cursor:pointer;display:flex;align-items:center;gap:.3rem;user-select:none">
+          <input type="checkbox" id="cfd-select-all" style="accent-color:var(--primary)"> Select All
+        </label>
+      </div>
+      <div id="cfd-list" style="max-height:200px;overflow-y:auto;padding:.2rem 0"></div>
+      <div style="padding:.4rem .7rem;border-top:1px solid var(--border);display:flex;gap:.4rem">
+        <button id="cfd-clear" style="flex:1;padding:.3rem;border:1px solid var(--border);border-radius:5px;font-size:.75rem;background:var(--bg);color:var(--txt-muted);cursor:pointer;font-family:Rubik,sans-serif">Clear</button>
+        <button id="cfd-done"  style="flex:1;padding:.3rem;border:none;border-radius:5px;font-size:.75rem;background:var(--primary);color:#fff;cursor:pointer;font-weight:600;font-family:Rubik,sans-serif">Done</button>
+      </div>`;
+
+    document.body.appendChild(popup);
+
+    function renderList(searchTerm = '') {
+      const list = document.getElementById('cfd-list');
+      if (!list) return;
+      const vals = searchTerm ? allValues.filter(v => v.toLowerCase().includes(searchTerm.toLowerCase())) : allValues;
+      if (!vals.length) {
+        list.innerHTML = `<div style="padding:.4rem .7rem;font-size:.78rem;color:var(--txt-muted);font-style:italic">No values</div>`;
+        return;
+      }
+      list.innerHTML = vals.map(v => `
+        <label style="display:flex;align-items:center;gap:.5rem;padding:.28rem .7rem;font-size:.78rem;cursor:pointer;white-space:nowrap;user-select:none">
+          <input type="checkbox" class="cfd-cb" value="${v.replace(/"/g,'&quot;')}" ${selected.has(v) ? 'checked' : ''} style="accent-color:var(--primary)">
+          <span style="overflow:hidden;text-overflow:ellipsis;max-width:170px" title="${v}">${v || '(blank)'}</span>
+        </label>`).join('');
+    }
+
+    renderList();
+
+    // Position popup below the button, keep on screen
+    const rect = btn.getBoundingClientRect();
+    popup.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
+    popup.style.top  = (rect.bottom + 4) + 'px';
+
+    // Select All initial state
+    const selectAllCb = document.getElementById('cfd-select-all');
+    selectAllCb.checked = selected.size === 0 || selected.size === allValues.length;
+
+    document.getElementById('cfd-search').addEventListener('input', e => {
+      renderList(e.target.value);
+    });
+
+    selectAllCb.addEventListener('change', () => {
+      document.querySelectorAll('#cfd-list .cfd-cb').forEach(cb => { cb.checked = selectAllCb.checked; });
+    });
+
+    document.getElementById('cfd-list').addEventListener('change', () => {
+      const checkedCount = document.querySelectorAll('#cfd-list .cfd-cb:checked').length;
+      selectAllCb.checked = checkedCount === allValues.length;
+    });
+
+    document.getElementById('cfd-clear').addEventListener('click', () => {
+      delete colFilters[colKey];
+      closeColFilterPopup();
+      renderDashboardRows();
+    });
+
+    document.getElementById('cfd-done').addEventListener('click', () => {
+      const checked = [...document.querySelectorAll('#cfd-list .cfd-cb:checked')].map(cb => cb.value);
+      if (checked.length === 0 || checked.length === allValues.length) {
+        delete colFilters[colKey];
+      } else {
+        colFilters[colKey] = new Set(checked);
+      }
+      closeColFilterPopup();
+      renderDashboardRows();
+    });
+
+    popup.addEventListener('click', e => e.stopPropagation());
+  }
+
+  // Delegate col-filter-btn clicks via the thead row
+  document.querySelector('#dashboard-tbody-wrap thead').addEventListener('click', e => {
+    const btn = e.target.closest('.col-filter-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    openColFilterPopup(btn, btn.dataset.col);
+  });
+
+  document.addEventListener('click', closeColFilterPopup);
 
   // Export button wiring (super_admin only)
   if (currentUser.role === 'super_admin') {
@@ -3196,37 +3199,115 @@ function openAddToolModal() {
 
 // ── USER PROJECTS PAGE (KANBAN) ───────────────────────────────
 function renderUserProjects(container) {
-  const projects = getProjects().filter(p => isMyProject(p, effectiveUser()));
+  const allMine = getProjects().filter(p => isMyProject(p, effectiveUser()));
 
-  const cols = [...MILESTONES, 'Complete'];
-  const colsHtml = cols.map((label, colIdx) => {
-    const isComplete = colIdx === MILESTONES.length;
-    const colProjects = projects.filter(p =>
-      isComplete ? getCurrentMilestone(p) === null : getCurrentMilestone(p) === MILESTONES[colIdx]
-    );
-    return `
-      <div class="kanban-col">
-        <div class="kanban-col-header ${isComplete ? 'kanban-col-complete' : ''}">
-          <span>${label}</span>
-          <span class="kanban-col-count">${colProjects.length}</span>
+  // Default filters: ongoing + Customer Onboarding
+  let filterStatus = 'ongoing';
+  let filterStage  = 'Customer Onboarding';
+
+  const uniqueStatuses = [...new Set(allMine.map(p => p.status).filter(Boolean))].sort();
+  const uniqueStages   = [...new Set(allMine.map(p => p.hubspotStage).filter(Boolean))].sort();
+
+  function getFiltered() {
+    return allMine.filter(p => {
+      const isInternal = p.createdBy !== 'hubspot';
+      if (filterStatus && p.status !== filterStatus) return false;
+      if (isInternal) return true; // internal projects bypass the stage filter
+      if (filterStage && p.hubspotStage !== filterStage) return false;
+      return true;
+    });
+  }
+
+  function renderKanban() {
+    const projects = getFiltered();
+    const cols = [...MILESTONES, 'Complete'];
+    const colsHtml = cols.map((label, colIdx) => {
+      const isComplete = colIdx === MILESTONES.length;
+      const colProjects = projects.filter(p =>
+        isComplete ? getCurrentMilestone(p) === null : getCurrentMilestone(p) === MILESTONES[colIdx]
+      );
+      return `
+        <div class="kanban-col">
+          <div class="kanban-col-header ${isComplete ? 'kanban-col-complete' : ''}">
+            <span>${label}</span>
+            <span class="kanban-col-count">${colProjects.length}</span>
+          </div>
+          <div class="kanban-col-body" data-col="${colIdx}">
+            ${colProjects.map(p => kanbanCard(p)).join('') || '<div class="kanban-empty">Drop projects here</div>'}
+          </div>
         </div>
-        <div class="kanban-col-body" data-col="${colIdx}">
-          ${colProjects.map(p => kanbanCard(p)).join('') || '<div class="kanban-empty">Drop projects here</div>'}
-        </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+
+    const board = document.getElementById('kanban-board-wrap');
+    if (!board) return;
+    board.innerHTML = projects.length
+      ? `<div class="kanban-board">${colsHtml}</div>`
+      : '<div class="empty-state"><div class="empty-icon">&#128193;</div>No projects match the current filters.</div>';
+
+    attachKanbanHandlers(container);
+  }
+
+  const statusOptions = [
+    { value: '',             label: 'All Statuses' },
+    { value: 'ongoing',      label: 'Ongoing' },
+    { value: 'completed',    label: 'Completed' },
+    { value: 'on-hold',      label: 'On Hold' },
+    { value: 'on-hold-sales',label: 'On Hold - Sales' },
+    { value: 'churn',        label: 'Churn' },
+  ].filter(o => o.value === '' || uniqueStatuses.includes(o.value));
+
+  const stageOptions = [
+    { value: '', label: 'All Stages' },
+    ...uniqueStages.map(s => ({ value: s, label: s })),
+  ];
 
   container.innerHTML = `
     <div class="page-header">
       <div><h2>My Projects</h2><p>Drag a project card to move it to a new milestone.</p></div>
     </div>
-    ${projects.length
-      ? `<div class="kanban-board">${colsHtml}</div>`
-      : '<div class="empty-state"><div class="empty-icon">&#128193;</div>No projects assigned to you yet.</div>'}
+    <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+      <select id="proj-filter-status" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt);cursor:pointer">
+        ${statusOptions.map(o => `<option value="${o.value}" ${o.value === filterStatus ? 'selected' : ''}>${o.label}</option>`).join('')}
+      </select>
+      <select id="proj-filter-stage" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt);cursor:pointer">
+        ${stageOptions.map(o => `<option value="${o.value}" ${o.value === filterStage ? 'selected' : ''}>${o.label}</option>`).join('')}
+      </select>
+      <button id="proj-filter-clear" style="padding:.4rem .9rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-weight:600;font-family:'Rubik',sans-serif;background:var(--bg);color:var(--txt-muted);cursor:pointer">✕ Show All</button>
+      <span id="proj-filter-count" style="font-size:.8rem;color:var(--txt-muted)"></span>
+    </div>
+    <div id="kanban-board-wrap"></div>
   `;
 
-  attachKanbanHandlers(container);
+  renderKanban();
+
+  // Update count label
+  function updateCount() {
+    const el = document.getElementById('proj-filter-count');
+    if (el) el.textContent = `${getFiltered().length} of ${allMine.length} projects`;
+  }
+  updateCount();
+
+  document.getElementById('proj-filter-status').addEventListener('change', e => {
+    filterStatus = e.target.value;
+    renderKanban();
+    updateCount();
+  });
+
+  document.getElementById('proj-filter-stage').addEventListener('change', e => {
+    filterStage = e.target.value;
+    renderKanban();
+    updateCount();
+  });
+
+  document.getElementById('proj-filter-clear').addEventListener('click', () => {
+    filterStatus = '';
+    filterStage  = '';
+    document.getElementById('proj-filter-status').value = '';
+    document.getElementById('proj-filter-stage').value  = '';
+    renderKanban();
+    updateCount();
+  });
 }
 
 function kanbanCard(p) {
