@@ -18,6 +18,187 @@ let MILESTONES = [
   'Project Handover',
 ];
 
+// ── Timeline phase/task structure (shared by modal + Excel download) ──
+// Each phase maps to one system milestone. Tasks are the standard sub-items.
+// indent: 0=task, 1=sub-task, 2=sub-sub-task
+const TIMELINE_PHASES = [
+  {
+    label: 'PHASE 1: KICK OFF MEETING',
+    milestone: 'Project Team Assignment',
+    tasks: [
+      { label: 'Introduction',                  duration: 1,    assignedTo: 'SPROUT' },
+      { label: 'Project Timeline',              duration: 1,    assignedTo: 'SPROUT' },
+      { label: 'HR Policy Questionnaire',       duration: '',   assignedTo: 'SPROUT AND CLIENT' },
+      { label: 'Payroll Policy Questionnaire',  duration: '',   assignedTo: 'SPROUT AND CLIENT' },
+    ],
+  },
+  {
+    label: 'PHASE 2: KOM / REQUIREMENTS ALIGNMENT',
+    milestone: 'KOM or Requirements Alignment',
+    tasks: [
+      { label: 'Kickoff Meeting',               duration: '',   assignedTo: 'SPROUT AND CLIENT' },
+      { label: 'Requirements Review',           duration: '',   assignedTo: 'SPROUT AND CLIENT' },
+      { label: 'Project Charter Sign-off',      duration: '',   assignedTo: 'SPROUT AND CLIENT' },
+    ],
+  },
+  {
+    label: 'PHASE 3: DATA GATHERING',
+    milestone: 'Data Gathering',
+    tasks: [
+      { label: 'Account Creation',              duration: 3,    assignedTo: 'SPROUT - HR AND PAYROLL IMPLEMENTER' },
+      { label: 'Data Submission',               duration: '',   assignedTo: 'CLIENT' },
+      { label: 'Masterfile',                    duration: 4,    assignedTo: 'CLIENT',  indent: 1 },
+      { label: 'Payroll Registers',             duration: '',   assignedTo: 'CLIENT',  indent: 1 },
+      { label: 'Data Validation',               duration: 2,    assignedTo: 'SPROUT - HR AND PAYROLL IMPLEMENTER' },
+      { label: 'Data Migration',                duration: 2,    assignedTo: 'SPROUT - HR IMPLEMENTER' },
+    ],
+  },
+  {
+    label: 'PHASE 4: SIMULATION I',
+    milestone: 'Simulation I',
+    tasks: [
+      { label: 'Payroll Simulation (Past Payroll Registers)', duration: 2, assignedTo: 'SPROUT - PAYROLL IMPLEMENTER' },
+    ],
+  },
+  {
+    label: 'PHASE 5: TRAINING AND SYSTEM SETUP',
+    milestone: 'Training and System Setup',
+    tasks: [
+      { label: 'Admin Training',                    duration: '',  assignedTo: '' },
+      { label: 'Sprout HR',                         duration: '',  assignedTo: '', indent: 1 },
+      { label: 'Online Training Videos',            duration: 1,   assignedTo: 'CLIENT', indent: 2 },
+      { label: 'Training Test Account',             duration: 1,   assignedTo: 'CLIENT', indent: 2 },
+      { label: 'Admin Training',                    duration: 1,   assignedTo: 'SPROUT AND CLIENT', indent: 2 },
+      { label: 'Sprout Payroll',                    duration: '',  assignedTo: '', indent: 1 },
+      { label: 'Online Training Videos',            duration: 1,   assignedTo: 'CLIENT', indent: 2 },
+      { label: 'Training Test Account',             duration: 1,   assignedTo: 'CLIENT', indent: 2 },
+      { label: 'Admin Training',                    duration: 1,   assignedTo: 'SPROUT AND CLIENT', indent: 2 },
+      { label: 'Sprout ReadyCash',                  duration: '',  assignedTo: '', indent: 1 },
+      { label: 'Overview and Training',             duration: 1,   assignedTo: 'SPROUT AND CLIENT', indent: 2 },
+      { label: 'Send Parallel Run & Cascade Strategy (Internal)', duration: '', assignedTo: 'Sprout - Project Managers' },
+      { label: 'User Cascade',                      duration: '',  assignedTo: '' },
+      { label: 'Employees Training',                duration: 3,   assignedTo: 'CLIENT', indent: 1 },
+      { label: 'Managers Training',                 duration: '',  assignedTo: 'CLIENT', indent: 1 },
+    ],
+  },
+  {
+    label: 'PHASE 6: PROJECT REVIEW',
+    milestone: 'Project Review Checklist',
+    tasks: [
+      { label: 'Sprout HR Project Review Checklist',      duration: 0.5, assignedTo: 'SPROUT AND CLIENT' },
+      { label: 'Sprout Payroll Project Review Checklist', duration: 0.5, assignedTo: 'SPROUT AND CLIENT' },
+    ],
+  },
+  {
+    label: 'PHASE 7: PARALLEL RUN',
+    milestone: 'Simulation II / Parallel Run',
+    tasks: [
+      { label: 'Cut Off / Payout Period',                   duration: 25, assignedTo: 'CLIENT' },
+      { label: 'Timekeeping Validation and Finalization',   duration: 2,  assignedTo: 'CLIENT' },
+      { label: 'Payroll Processing and Finalization',       duration: 2,  assignedTo: 'CLIENT' },
+      { label: 'Variance Discussion',                       duration: 1,  assignedTo: 'SPROUT AND CLIENT' },
+    ],
+  },
+  {
+    label: 'PHASE 8: IMPLEMENTATION SIGN OFF',
+    milestone: 'Pre Handover',
+    milestone2: 'Project Handover',
+    tasks: [
+      { label: 'Pre-handover',                  duration: 1,   assignedTo: 'SPROUT AND CLIENT' },
+      { label: 'Pre-handover Internal Meeting', duration: 1,   assignedTo: 'SPROUT' },
+      { label: 'Project Handover',              duration: 1,   assignedTo: 'SPROUT AND CLIENT' },
+    ],
+  },
+  {
+    label: 'PHASE 9: ADOPTION / HYPERCARE',
+    milestone: 'Hypercare',
+    tasks: [
+      { label: 'Transition to Customer Success Manager', duration: '', assignedTo: 'SPROUT' },
+    ],
+  },
+];
+
+// ── Build Timeline Planning rows (modal) ──────────────────────
+// Returns HTML string for the Timeline Planning tab
+function buildPlanningRows(timeline, milestones, isReadOnly) {
+  const dateCss = `font-size:.75rem;padding:.22rem .4rem;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.15);color:#fff;width:120px;color-scheme:dark`;
+  let html = '';
+  TIMELINE_PHASES.forEach((phase, pi) => {
+    const m         = phase.milestone;
+    const startDate = timeline[m]?.startDate || '';
+    const endDate   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
+    const done      = !!milestones[m];
+    const done2     = !phase.milestone2 || !!milestones[phase.milestone2];
+    const phaseDone = done && done2;
+    const phaseIdx  = MILESTONES.indexOf(m);
+    const prevDone  = phaseIdx <= 0 || MILESTONES.slice(0, phaseIdx).every(ms => milestones[ms]);
+    const isActive  = !phaseDone && prevDone;
+    const headerBg  = phaseDone ? '#166534' : isActive ? '#065f46' : '#1a6b08';
+    const rowBg     = phaseDone ? '#f0fdf4' : isActive ? '#fffbeb' : '#fafafa';
+    const statusBadge = phaseDone
+      ? `<span style="font-size:.65rem;background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:10px;font-weight:700;white-space:nowrap">✓ Done</span>`
+      : isActive
+        ? `<span style="font-size:.65rem;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;font-weight:700;white-space:nowrap">▶ Active</span>`
+        : '';
+
+    // Phase header row — label | badge | From date | To date
+    html += `<div style="border-radius:8px;overflow:hidden;border:1.5px solid #166534;margin-bottom:.2rem">
+      <div style="background:${headerBg};color:#fff;display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.55rem .9rem">
+        <span style="font-size:.8rem;font-weight:700;letter-spacing:.3px">${phase.label}</span>
+        <span>${statusBadge}</span>
+        <div style="display:flex;flex-direction:column;gap:1px;align-items:flex-end">
+          <span style="font-size:.58rem;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em">Start</span>
+          <input type="date" class="plan-start" data-milestone="${m}" value="${startDate}"
+            ${isReadOnly ? 'disabled' : ''} style="${dateCss}" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1px;align-items:flex-end">
+          <span style="font-size:.58rem;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em">End</span>
+          <input type="date" class="plan-end" data-milestone="${m}" value="${endDate}"
+            ${isReadOnly ? 'disabled' : ''} style="${dateCss}" />
+        </div>
+      </div>`;
+
+    // Sub-task rows
+    phase.tasks.forEach(task => {
+      const indent = task.indent || 0;
+      const pl     = 14 + indent * 18;
+      const isHdr  = !task.duration && !task.assignedTo;
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.28rem .9rem .28rem ${pl}px;background:${rowBg};border-top:1px solid #e4ece4">
+        <span style="font-size:.77rem;font-weight:${isHdr?'600':'400'};color:${isHdr?'#166534':'#374151'};flex:1">${task.label}</span>
+        ${task.duration !== '' && task.duration != null ? `<span style="font-size:.68rem;color:#6b7280;white-space:nowrap">${task.duration}d</span>` : ''}
+        ${task.assignedTo ? `<span style="font-size:.65rem;background:#e4ece4;color:#374151;padding:1px 6px;border-radius:8px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis">${task.assignedTo}</span>` : ''}
+      </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  // Any extra milestones not covered by TIMELINE_PHASES (custom ones)
+  const coveredMs = new Set(TIMELINE_PHASES.flatMap(ph => [ph.milestone, ph.milestone2].filter(Boolean)));
+  MILESTONES.forEach((m, i) => {
+    if (coveredMs.has(m)) return;
+    const startDate = timeline[m]?.startDate || '';
+    const endDate   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
+    html += `<div style="display:grid;grid-template-columns:1fr 130px 130px;gap:.5rem;align-items:center;padding:.5rem .9rem;border-radius:8px;border:1.5px solid var(--border);background:var(--bg)">
+      <span style="font-size:.85rem;font-weight:500">${m}</span>
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <span style="font-size:.6rem;color:var(--txt-muted);text-transform:uppercase">Start</span>
+        <input type="date" class="plan-start" data-milestone="${m}" value="${startDate}"
+          ${isReadOnly ? 'disabled' : ''}
+          style="font-size:.8rem;padding:.3rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly?'#f8f8f8':'var(--surface)'};color:var(--txt);width:100%" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <span style="font-size:.6rem;color:var(--txt-muted);text-transform:uppercase">End</span>
+        <input type="date" class="plan-end" data-milestone="${m}" value="${endDate}"
+          ${isReadOnly ? 'disabled' : ''}
+          style="font-size:.8rem;padding:.3rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly?'#f8f8f8':'var(--surface)'};color:var(--txt);width:100%" />
+      </div>
+    </div>`;
+  });
+
+  return html;
+}
+
 // ── MULTI-SELECT HELPER (shared) ──────────────────────────────
 // items: array of {value, label} or plain strings
 function buildMultiSelect(id, baseLabel, items) {
@@ -4640,17 +4821,7 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
     }).join('');
 
     // Timeline tab rows
-    const planningRows = MILESTONES.map((m, i) => {
-      const targetDate = timeline[m]?.targetDate || '';
-      return `
-        <div style="display:grid;grid-template-columns:36px 1fr 150px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid var(--border);background:var(--bg)">
-          <span style="font-size:.72rem;color:var(--txt-muted);font-weight:700;text-align:center">${i + 1}</span>
-          <span style="font-size:.88rem;font-weight:500">${m}</span>
-          <input type="date" class="plan-target" data-milestone="${m}" value="${targetDate}"
-            ${isReadOnly ? 'disabled' : ''}
-            style="font-size:.82rem;padding:.35rem .55rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly ? '#f8f8f8' : 'var(--surface)'};color:var(--txt);width:100%" />
-        </div>`;
-    }).join('');
+    const planningRows = buildPlanningRows(timeline, milestones, isReadOnly);
 
     // Documents tab
     const docsHtml = salesDocs.length > 0
@@ -4717,11 +4888,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
 
       <!-- Timeline Tab -->
       <div id="pf-tab-timeline" style="display:${activeTab === 'timeline' ? 'block' : 'none'}">
-        <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates for all milestones. Save first, then download to share with your client.</p>
-        <div style="display:grid;grid-template-columns:36px 1fr 150px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
-          <div style="text-align:center">#</div><div>Milestone</div><div>Target Date</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:.35rem">${planningRows}</div>
+        <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates per phase. Save first, then download to share with your client.</p>
+        <div style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
         <div class="modal-actions" style="margin-top:1.2rem">
           <button class="btn btn-ghost pf-close-btn">Close</button>
           <button class="btn btn-ghost" id="pf-tl-download-btn">&#11123; Download Timeline</button>
@@ -4782,7 +4950,11 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       </div>
     `);
 
-    modal.querySelector('.modal').style.maxWidth = '860px';
+    const pfBox = modal.querySelector('.modal');
+    pfBox.style.maxWidth  = '860px';
+    pfBox.style.width     = '96%';
+    pfBox.style.maxHeight = '90vh';
+    pfBox.style.overflowY = 'auto';
 
     // Tab switching
     modal.querySelectorAll('.pf-tab').forEach(btn => {
@@ -4846,9 +5018,13 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
     // Timeline helpers
     function collectTimeline() {
       const updated = { ...timeline };
-      modal.querySelectorAll('.plan-target').forEach(input => {
+      modal.querySelectorAll('.plan-start').forEach(input => {
         const m = input.dataset.milestone;
-        updated[m] = { ...(updated[m] || {}), targetDate: input.value };
+        updated[m] = { ...(updated[m] || {}), startDate: input.value };
+      });
+      modal.querySelectorAll('.plan-end').forEach(input => {
+        const m = input.dataset.milestone;
+        updated[m] = { ...(updated[m] || {}), endDate: input.value, targetDate: input.value };
       });
       return updated;
     }
@@ -7519,18 +7695,7 @@ function openMilestonesModal(projectId) {
   const today          = new Date().toISOString().split('T')[0];
 
   // ── Tab 1: Timeline Planning rows ─────────────────────────────
-  const planningRows = MILESTONES.map((m, i) => {
-    const targetDate = timeline[m]?.targetDate || '';
-    const done       = !!milestones[m];
-    return `
-      <div style="display:grid;grid-template-columns:36px 1fr 150px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid var(--border);background:var(--bg)">
-        <span style="font-size:.72rem;color:var(--txt-muted);font-weight:700;text-align:center">${i + 1}</span>
-        <span style="font-size:.88rem;font-weight:500">${m}</span>
-        <input type="date" class="plan-target" data-milestone="${m}" value="${targetDate}"
-          ${isReadOnly ? 'disabled' : ''}
-          style="font-size:.82rem;padding:.35rem .55rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly ? '#f8f8f8' : 'var(--surface)'};color:var(--txt);width:100%" />
-      </div>`;
-  }).join('');
+  const planningRows = buildPlanningRows(timeline, milestones, isReadOnly);
 
   // ── Tab 2: Progress Tracking rows ─────────────────────────────
   const progressRows = MILESTONES.map((m, i) => {
@@ -7576,11 +7741,8 @@ function openMilestonesModal(projectId) {
 
     <!-- Tab 1: Planning -->
     <div id="tab-plan">
-      <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates for all milestones. Save first, then download to present to your client.</p>
-      <div style="display:grid;grid-template-columns:36px 1fr 150px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
-        <div style="text-align:center">#</div><div>Milestone</div><div>Target Date</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:.35rem">${planningRows}</div>
+      <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates per phase. Save first, then download to present to your client.</p>
+      <div style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
       <div class="modal-actions" style="margin-top:1.2rem">
         <button class="btn btn-ghost" id="modal-cancel">Close</button>
         <button class="btn btn-ghost" id="plan-download-btn">&#11123; Download Timeline</button>
@@ -7611,7 +7773,11 @@ function openMilestonesModal(projectId) {
     </div>
   `);
 
-  modal.querySelector('.modal').style.maxWidth = '700px';
+  const mBox = modal.querySelector('.modal');
+  mBox.style.maxWidth  = '860px';
+  mBox.style.width     = '96%';
+  mBox.style.maxHeight = '90vh';
+  mBox.style.overflowY = 'auto';
 
   // ── Tab switching ──────────────────────────────────────────────
   modal.querySelectorAll('.ms-tab').forEach(btn => {
@@ -7676,9 +7842,13 @@ function openMilestonesModal(projectId) {
   // ── Save target dates (Tab 1) ──────────────────────────────────
   function collectTimeline() {
     const updated = { ...timeline };
-    modal.querySelectorAll('.plan-target').forEach(input => {
+    modal.querySelectorAll('.plan-start').forEach(input => {
       const m = input.dataset.milestone;
-      updated[m] = { ...(updated[m] || {}), targetDate: input.value };
+      updated[m] = { ...(updated[m] || {}), startDate: input.value };
+    });
+    modal.querySelectorAll('.plan-end').forEach(input => {
+      const m = input.dataset.milestone;
+      updated[m] = { ...(updated[m] || {}), endDate: input.value, targetDate: input.value };
     });
     return updated;
   }
@@ -7753,7 +7923,7 @@ function openDashboardChatModal(dashboardData) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.innerHTML = `
-    <div class="modal" style="max-width:660px;width:95%;display:flex;flex-direction:column;height:600px;padding:0;overflow:hidden">
+    <div class="modal" style="max-width:820px;width:96%;display:flex;flex-direction:column;height:88vh;max-height:820px;padding:0;overflow:hidden">
 
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.3rem;border-bottom:1.5px solid var(--border);flex-shrink:0;background:linear-gradient(135deg,#f0fdf4,#fff)">
@@ -8186,121 +8356,121 @@ function downloadTimeline(p, milestones, timeline) {
   milestones = milestones || p.milestones || {};
   timeline   = timeline   || p.timeline   || {};
 
-  const pmName    = projectManagerDisplay(p.projectManager);
-  const today     = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const completed = MILESTONES.filter(m => milestones[m]).length;
-  const progress  = Math.round((completed / MILESTONES.length) * 100);
+  const pmName = projectManagerDisplay(p.projectManager);
+  const today  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const rows = MILESTONES.map((m, i) => {
-    const done       = !!milestones[m];
-    const target     = timeline[m]?.targetDate || '';
-    const actual     = timeline[m]?.actualDate || '';
-    const current    = !done && i === completed;
+  // Helper: get phase status based on milestone completion
+  function phaseStatus(phase) {
+    const done  = !!milestones[phase.milestone];
+    const done2 = !phase.milestone2 || !!milestones[phase.milestone2];
+    if (done && done2) return 'done';
+    const idx     = MILESTONES.indexOf(phase.milestone);
+    const prevAll = idx <= 0 || MILESTONES.slice(0, idx).every(m => milestones[m]);
+    return prevAll ? 'active' : 'pending';
+  }
 
-    let status    = done ? 'Completed' : current ? 'In Progress' : 'Pending';
-    let variance  = '—';
-    if (done && target && actual) {
-      const diff = Math.round((new Date(actual) - new Date(target)) / 86400000);
-      variance   = diff === 0 ? 'On time' : diff > 0 ? `+${diff} days` : `${diff} days`;
-    }
+  // Format date string to MM/DD/YYYY for display
+  function fmtXlDate(d) {
+    if (!d) return '';
+    const dt = new Date(d + 'T00:00:00');
+    if (isNaN(dt)) return d;
+    return (dt.getMonth()+1).toString().padStart(2,'0') + '/' + dt.getDate().toString().padStart(2,'0') + '/' + dt.getFullYear();
+  }
 
-    const bg = done ? '#d4f5ca' : current ? '#fff9c4' : '#f8f8f8';
-    const statusColor = done ? '#166534' : current ? '#854d0e' : '#607060';
+  const C = 7; // column count
+  let rows = '';
 
-    return `
-      <tr>
-        <td style="background:${bg};text-align:center;font-weight:600;color:#607060">${i + 1}</td>
-        <td style="background:${bg};font-weight:${done || current ? '600' : '400'}">${m}</td>
-        <td style="background:${bg};text-align:center">${target || '—'}</td>
-        <td style="background:${bg};text-align:center;font-weight:${done ? '600' : '400'};color:${done ? '#166534' : '#607060'}">${actual || '—'}</td>
-        <td style="background:${bg};text-align:center;font-weight:600;color:${statusColor}">${status}</td>
-        <td style="background:${bg};text-align:center;color:${variance.startsWith('+') ? '#dc2626' : variance.startsWith('-') ? '#16a34a' : '#607060'}">${variance}</td>
+  TIMELINE_PHASES.forEach(phase => {
+    const st        = phaseStatus(phase);
+    const msData    = timeline[phase.milestone] || {};
+    const startDate = fmtXlDate(msData.startDate || '');
+    const endDate   = fmtXlDate(msData.endDate || msData.targetDate || '');
+    const phaseBg    = '#1a6b08';
+    const statusText = st === 'done' ? 'COMPLETED' : st === 'active' ? 'IN PROGRESS' : 'NOT STARTED';
+    const statusBg   = st === 'done' ? '#d4f5ca' : st === 'active' ? '#fef3c7' : '#fde8c8';
+    const statusFg   = st === 'done' ? '#166534' : st === 'active' ? '#854d0e' : '#9a3412';
+    const rowBg      = st === 'done' ? '#f0fdf4' : st === 'active' ? '#fffbeb' : '#ffffff';
+
+    // Phase header row
+    rows += `<tr>
+      <td colspan="6" style="background:${phaseBg};color:#fff;font-weight:700;padding:7px 12px;font-size:10.5pt;border:1px solid #0f4b05;letter-spacing:.4px">${phase.label}</td>
+      <td style="background:${phaseBg};color:#fff;padding:7px;border:1px solid #0f4b05"></td>
+    </tr>`;
+
+    phase.tasks.forEach(task => {
+      const indent   = (task.indent || 0);
+      const pl       = 10 + indent * 18;
+      const isHeader = !task.duration && !task.assignedTo;
+      const taskSt   = (isHeader || (!task.assignedTo && !task.duration)) ? '' : statusText;
+      const taskStBg = taskSt ? statusBg : rowBg;
+      const taskStFg = taskSt ? statusFg : '#607060';
+      rows += `<tr>
+        <td style="background:${rowBg};padding:5px 6px 5px ${pl}px;border:1px solid #e4ece4;font-weight:${isHeader?'600':'400'};color:#092903">${task.label}</td>
+        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#607060">${task.duration !== '' && task.duration != null ? task.duration : ''}</td>
+        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#607060">${task.assignedTo || ''}</td>
+        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#5a7a5a">${task.assignedTo ? startDate : ''}</td>
+        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#5a7a5a">${task.assignedTo ? endDate : ''}</td>
+        <td style="background:${taskStBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;font-weight:700;color:${taskStFg};font-size:8.5pt">${taskSt}</td>
+        <td style="background:${rowBg};padding:5px 6px;border:1px solid #e4ece4"></td>
       </tr>`;
-  }).join('');
+    });
+  });
 
-  const html = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-    <head><meta charset="UTF-8">
-    <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-    <x:Name>Timeline</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-    </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
-    </head>
-    <body>
-    <table border="0" cellpadding="6" cellspacing="0" style="font-family:Calibri,Arial,sans-serif;font-size:11pt;border-collapse:collapse;min-width:700px">
+  // Footer row matching template
+  rows += `<tr>
+    <td colspan="${C}" style="background:#1a6b08;color:#fff;font-weight:600;padding:8px 12px;border:1px solid #0f4b05;text-align:center;font-size:9.5pt">
+      Transition to Your Customer Success Manager upon Project Handover completion.
+    </td>
+  </tr>`;
 
-      <!-- Branding Header -->
-      <tr>
-        <td colspan="6" style="background:#092903;color:#32CE13;font-size:20pt;font-weight:700;padding:14px 18px;letter-spacing:1px">
-          SPROUT SOLUTIONS
-        </td>
-      </tr>
-      <tr>
-        <td colspan="6" style="background:#0f3d07;color:#a8e8a0;font-size:12pt;font-weight:600;padding:8px 18px;letter-spacing:.5px">
-          PROJECT IMPLEMENTATION TIMELINE
-        </td>
-      </tr>
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>Project Timeline</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" style="font-family:Calibri,Arial,sans-serif;font-size:10pt;border-collapse:collapse;min-width:900px">
 
-      <!-- Spacer -->
-      <tr><td colspan="6" style="padding:4px"></td></tr>
+  <!-- Title -->
+  <tr>
+    <td colspan="${C}" style="background:#1a6b08;color:#fff;font-size:15pt;font-weight:700;padding:14px 18px;text-align:center;letter-spacing:.5px">
+      ${p.title} — PROJECT TIMELINE
+    </td>
+  </tr>
 
-      <!-- Project Info -->
-      <tr>
-        <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">Project</td>
-        <td colspan="4" style="background:#f0fdf4;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">${p.title}</td>
-      </tr>
-      <tr>
-        <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">Project Manager</td>
-        <td colspan="4" style="background:#f0fdf4;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">${pmName}</td>
-      </tr>
-      <tr>
-        <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">Due Date</td>
-        <td colspan="4" style="background:#f0fdf4;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">${p.dueDate || '—'}</td>
-      </tr>
-      <tr>
-        <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">Overall Progress</td>
-        <td colspan="4" style="background:#f0fdf4;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">${completed}/${MILESTONES.length} milestones — ${progress}%</td>
-      </tr>
-      <tr>
-        <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">Export Date</td>
-        <td colspan="4" style="background:#f0fdf4;color:#092903;padding:6px 10px;border:1px solid #d4f5ca">${today}</td>
-      </tr>
+  <!-- Column headers -->
+  <tr>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;padding:8px 10px;border:1px solid #0f4b05;width:300px">TASK</td>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;text-align:center;padding:8px 6px;border:1px solid #0f4b05;width:80px">DURATION (DAYS)</td>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;text-align:center;padding:8px 6px;border:1px solid #0f4b05;width:180px">ASSIGNED TO</td>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;text-align:center;padding:8px 6px;border:1px solid #0f4b05;width:110px">TARGET START DATE</td>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;text-align:center;padding:8px 6px;border:1px solid #0f4b05;width:110px">TARGET END DATE</td>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;text-align:center;padding:8px 6px;border:1px solid #0f4b05;width:100px">STATUS</td>
+    <td style="background:#1a6b08;color:#fff;font-weight:700;padding:8px 6px;border:1px solid #0f4b05;width:160px">REMARKS</td>
+  </tr>
 
-      <!-- Spacer -->
-      <tr><td colspan="6" style="padding:4px"></td></tr>
+  ${rows}
 
-      <!-- Table Header -->
-      <tr>
-        <td style="background:#092903;color:#32CE13;font-weight:700;text-align:center;padding:8px 10px;border:1px solid #0f3d07;width:40px">#</td>
-        <td style="background:#092903;color:#32CE13;font-weight:700;padding:8px 10px;border:1px solid #0f3d07;width:260px">Milestone</td>
-        <td style="background:#092903;color:#32CE13;font-weight:700;text-align:center;padding:8px 10px;border:1px solid #0f3d07;width:110px">Target Date</td>
-        <td style="background:#092903;color:#32CE13;font-weight:700;text-align:center;padding:8px 10px;border:1px solid #0f3d07;width:110px">Actual Date</td>
-        <td style="background:#092903;color:#32CE13;font-weight:700;text-align:center;padding:8px 10px;border:1px solid #0f3d07;width:100px">Status</td>
-        <td style="background:#092903;color:#32CE13;font-weight:700;text-align:center;padding:8px 10px;border:1px solid #0f3d07;width:80px">Variance</td>
-      </tr>
+  <!-- Footer info -->
+  <tr><td colspan="${C}" style="padding:6px"></td></tr>
+  <tr>
+    <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:5px 10px;border:1px solid #d4f5ca">Project Manager</td>
+    <td colspan="5" style="background:#f0fdf4;color:#092903;padding:5px 10px;border:1px solid #d4f5ca">${pmName}</td>
+  </tr>
+  <tr>
+    <td colspan="2" style="background:#f0fdf4;font-weight:700;color:#092903;padding:5px 10px;border:1px solid #d4f5ca">Export Date</td>
+    <td colspan="5" style="background:#f0fdf4;color:#092903;padding:5px 10px;border:1px solid #d4f5ca">${today}</td>
+  </tr>
 
-      <!-- Milestone Rows -->
-      ${rows}
-
-      <!-- Legend -->
-      <tr><td colspan="6" style="padding:6px"></td></tr>
-      <tr>
-        <td colspan="6" style="font-size:9pt;color:#607060;padding:4px 10px">
-          Legend: &nbsp;
-          <span style="background:#d4f5ca;padding:2px 8px;border-radius:3px;margin-right:6px">Completed</span>
-          <span style="background:#fff9c4;padding:2px 8px;border-radius:3px;margin-right:6px">In Progress</span>
-          <span style="background:#f8f8f8;padding:2px 8px;border-radius:3px">Pending</span>
-          &nbsp;|&nbsp; Variance: negative = ahead of schedule, positive = delayed
-        </td>
-      </tr>
-
-    </table>
-    </body></html>`;
+</table>
+</body></html>`;
 
   const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = `${p.title} - Implementation Timeline.xls`;
+  a.download = `${p.title} - Project Timeline.xls`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

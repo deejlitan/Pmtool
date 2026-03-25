@@ -217,158 +217,129 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
   const recordings = hub.recordings      || [];
 
   const completedCount = MILESTONES.filter(m => milestones[m]).length;
+  const inProgressCount = 1; // always 1 "in progress" unless all done
+  const pendingCount   = Math.max(0, MILESTONES.length - completedCount - (completedCount < MILESTONES.length ? 1 : 0));
   const progress       = MILESTONES.length ? Math.round((completedCount / MILESTONES.length) * 100) : 0;
   const serverToday    = new Date().toISOString().split('T')[0];
 
-  // PM name lookup
   const allUsers = getUsers();
   const pm = project?.projectManager ? allUsers.find(u => u.id === project.projectManager) : null;
 
-  // Internal-user admin banner
+  const statusLabel = s => ({ ongoing:'Ongoing', 'on-hold':'On Hold', 'on-hold-sales':'On Hold – Sales', churn:'Churned', completed:'Completed' }[s] || (s||'—'));
+  const statusColor = s => ({ ongoing:'#16a34a', 'on-hold':'#d97706', 'on-hold-sales':'#9333ea', churn:'#dc2626', completed:'#0891b2' }[s] || '#5a7a5a');
+
   const adminBanner = isInternalUser ? `
-    <div class="internal-banner" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
-      <span>🔒 <strong>Internal View</strong> — You are viewing this as a logged-in Sprout team member. Clients see only the sections you have enabled.</span>
-      <a href="/hub/${escHtml(hub.slug)}/logout" style="font-size:.8rem;font-weight:700;color:#092903;background:#d2f96d;border:1px solid #a3d900;border-radius:8px;padding:5px 14px;text-decoration:none;white-space:nowrap;flex-shrink:0">🚪 Test Client View</a>
+    <div style="background:#eafce6;border-bottom:2px solid #32CE13;padding:10px 40px;font-size:.84rem;color:#092903;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+      <span>🔒 <strong>Internal View</strong> — You are viewing this as a logged-in Sprout team member.</span>
+      <a href="/hub/${escHtml(hub.slug)}/logout" style="font-size:.79rem;font-weight:700;color:#092903;background:#d2f96d;border:1px solid #a3d900;border-radius:7px;padding:4px 12px;text-decoration:none;white-space:nowrap;flex-shrink:0">🚪 Test Client View</a>
     </div>` : '';
 
-  // ── Section: Milestones ──
-  const msSection = sections.milestones ? `
-    <section class="hub-section" id="milestones">
-      <h2 class="section-title">🏁 Project Milestones</h2>
-      <div class="hub-card">
-        <div class="progress-header">
-          <span class="progress-label">Overall Progress</span>
-          <span class="progress-value">${completedCount} / ${MILESTONES.length} &nbsp; ${progress}%</span>
-        </div>
-        ${progressBar(progress)}
-        <div class="ms-list">
-          ${MILESTONES.map((m, i) => {
+  // ── Zigzag milestone timeline ──
+  const msZigzag = MILESTONES.map((m, i) => {
     const done      = !!milestones[m];
-    const isCurrent = !done && MILESTONES.slice(0, i).every(pm2 => milestones[pm2]);
+    const isCurrent = !done && MILESTONES.slice(0, i).every(prev => milestones[prev]);
+    const target    = timeline[m]?.endDate || timeline[m]?.targetDate;
+    const actual    = timeline[m]?.actualDate || (done ? serverToday : '');
+    const isLeft    = i % 2 === 0;
+    const dotColor  = done ? '#16a34a' : isCurrent ? '#d97706' : '#d1d5db';
+    const dotIcon   = done ? '✓' : isCurrent ? '▶' : String(i + 1);
+    const cardBg    = done ? '#f0fdf4' : isCurrent ? '#fffbeb' : '#fff';
+    const cardBorder= done ? '#86efac' : isCurrent ? '#fcd34d' : '#e4ece4';
+    const badge     = done
+      ? `<span style="font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:20px;background:#d1fae5;color:#065f46">✓ Completed</span>`
+      : isCurrent
+        ? `<span style="font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:20px;background:#fef3c7;color:#92400e;animation:pulse-badge 2s infinite">▶ In Progress</span>`
+        : `<span style="font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:20px;background:#f3f4f6;color:#6b7280">Pending</span>`;
+    const dateHtml  = done
+      ? `${target ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:3px">🎯 Target: ${fmtDate(target)}</div>` : ''}<div style="font-size:.72rem;color:#16a34a;font-weight:600;margin-top:2px">✅ Completed: ${fmtDate(actual)}</div>`
+      : target ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:3px">🎯 Target: ${fmtDate(target)}</div>` : '';
+    const card = `
+      <div style="background:${cardBg};border:1.5px solid ${cardBorder};border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(9,41,3,.06);max-width:340px;${isLeft?'margin-left:auto;margin-right:24px':'margin-left:24px;margin-right:auto'}">
+        <div style="font-size:.88rem;font-weight:700;color:#092903;margin-bottom:4px">${escHtml(m)}</div>
+        ${dateHtml}
+        <div style="margin-top:8px">${badge}</div>
+      </div>`;
     return `
-            <div class="ms-row ${done ? 'ms-done' : isCurrent ? 'ms-current' : 'ms-pending'}">
-              <div class="ms-check-wrap">
-                ${done ? '<span class="ms-check-icon">✓</span>' : isCurrent ? '<span class="ms-cur-icon">▶</span>' : '<span class="ms-pend-icon">○</span>'}
-              </div>
-              <div class="ms-info">
-                <div class="ms-name">${escHtml(m)}</div>
-                ${(() => { const a = timeline[m]?.actualDate || (done ? serverToday : ''); return done ? `<div class="ms-date ms-date-actual">Completed: ${fmtDate(a)}</div>` : timeline[m]?.targetDate ? `<div class="ms-date">Target: ${fmtDate(timeline[m].targetDate)}</div>` : ''; })()}
-              </div>
-              ${done ? `<span class="ms-badge ms-badge-done">Completed</span>` : isCurrent ? `<span class="ms-badge ms-badge-cur">In Progress</span>` : `<span class="ms-badge ms-badge-pend">Pending</span>`}
-            </div>`;
-  }).join('')}
+      <div style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:center;position:relative;min-height:80px">
+        <div>${isLeft ? card : ''}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;z-index:1">
+          <div style="width:36px;height:36px;border-radius:50%;background:${dotColor};color:#fff;font-family:'Fira Sans',sans-serif;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px ${done?'#d1fae5':isCurrent?'#fef3c7':'#f3f4f6'};${isCurrent?'animation:pulse-dot 2s infinite':''}">
+            ${dotIcon}
+          </div>
+          ${i < MILESTONES.length - 1 ? `<div style="width:2px;height:32px;background:${done?'#86efac':'#e4ece4'};margin-top:2px"></div>` : ''}
         </div>
+        <div>${!isLeft ? card : ''}</div>
+      </div>`;
+  }).join('');
+
+  // ── Documents section ──
+  const docsHtml = sections.documents ? `
+    <section id="documents" style="margin-bottom:40px">
+      <div style="font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a7a5a;margin-bottom:14px;border-left:4px solid #32CE13;padding-left:12px">📄 Project Documents</div>
+      <div style="background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 2px 10px rgba(9,41,3,.07)">
+        ${salesDocs.length === 0
+          ? '<div style="color:#8aaa8a;font-size:.88rem;text-align:center;padding:12px 0">No documents have been shared yet.</div>'
+          : `<ul style="list-style:none;display:flex;flex-direction:column;gap:8px">${salesDocs.map(d=>`
+            <li><a href="${escHtml(d.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;text-decoration:none;color:#1a6b08;font-weight:500;font-size:.9rem;border:1px solid #e4ece4;transition:background .15s" onmouseover="this.style.background='#eafce6'" onmouseout="this.style.background=''">
+              <span style="font-size:1.1rem">📎</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(d.name||d.url)}</span>
+              <span style="font-size:.85rem;color:#9ab09a">↗</span>
+            </a></li>`).join('')}</ul>`}
       </div>
     </section>` : '';
 
-  // ── Section: Timeline ──
-  const tlSection = sections.timeline ? `
-    <section class="hub-section" id="timeline">
-      <h2 class="section-title">📅 Project Timeline</h2>
-      <div class="hub-card">
-        <table class="hub-table">
-          <thead>
-            <tr><th>#</th><th>Milestone</th><th>Target Date</th><th>Completed On</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            ${MILESTONES.map((m, i) => {
-    const done       = !!milestones[m];
-    const target     = timeline[m]?.targetDate;
-    const actual     = timeline[m]?.actualDate || (done ? serverToday : '');
-    const statusCls  = done ? 'tl-done' : (i === completedCount ? 'tl-cur' : 'tl-pend');
-    const statusLbl  = done ? '✓ Done' : (i === completedCount ? '▶ In Progress' : '○ Pending');
-    return `
-              <tr class="${statusCls}">
-                <td>${i + 1}</td>
-                <td>${escHtml(m)}</td>
-                <td>${fmtDate(target)}</td>
-                <td style="${done ? 'color:#16a34a;font-weight:600' : 'color:#9ca3af'}">${done ? fmtDate(actual) : '—'}</td>
-                <td><span class="tl-badge tl-badge-${done ? 'done' : i === completedCount ? 'cur' : 'pend'}">${statusLbl}</span></td>
-              </tr>`;
-  }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>` : '';
-
-  // ── Section: Documents ──
-  const docsSection = sections.documents && salesDocs.length > 0 ? `
-    <section class="hub-section" id="documents">
-      <h2 class="section-title">📄 Project Documents</h2>
-      <div class="hub-card">
-        <ul class="hub-link-list">
-          ${salesDocs.map(d => `
-            <li>
-              <a href="${escHtml(d.url)}" target="_blank" rel="noopener">
-                <span class="link-icon">📎</span>
-                <span class="link-label">${escHtml(d.name || d.url)}</span>
-                <span class="link-arrow">↗</span>
-              </a>
-            </li>`).join('')}
-        </ul>
-      </div>
-    </section>` : (sections.documents ? `
-    <section class="hub-section" id="documents">
-      <h2 class="section-title">📄 Project Documents</h2>
-      <div class="hub-card hub-empty">No documents have been shared yet.</div>
-    </section>` : '');
-
-  // ── Section: Recordings (Full access only) ──
-  const recSection = sections.recordings && canSee('recordings') ? `
-    <section class="hub-section" id="recordings">
-      <h2 class="section-title">🎬 Meeting Recordings</h2>
-      <div class="hub-card">
+  // ── Recordings section ──
+  const recHtml = sections.recordings && canSee('recordings') ? `
+    <section id="recordings" style="margin-bottom:40px">
+      <div style="font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a7a5a;margin-bottom:14px;border-left:4px solid #8139EE;padding-left:12px">🎬 Meeting Recordings</div>
+      <div style="background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 2px 10px rgba(9,41,3,.07)">
         ${recordings.length === 0
-    ? '<div class="hub-empty-inner">No recordings have been added yet.</div>'
-    : `<ul class="hub-link-list">
-            ${recordings.map(r => `
-              <li>
-                <a href="${escHtml(r.driveUrl)}" target="_blank" rel="noopener">
-                  <span class="link-icon">▶️</span>
-                  <span class="link-label">${escHtml(r.name)}</span>
-                  <span class="link-meta">${fmtDate(r.addedAt)}</span>
-                  <span class="link-arrow">↗</span>
-                </a>
-              </li>`).join('')}
-          </ul>`}
+          ? '<div style="color:#8aaa8a;font-size:.88rem;text-align:center;padding:12px 0">No recordings have been added yet.</div>'
+          : `<ul style="list-style:none;display:flex;flex-direction:column;gap:8px">${recordings.map(r=>`
+            <li><a href="${escHtml(r.driveUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;text-decoration:none;color:#5a3d9a;font-weight:500;font-size:.9rem;border:1px solid #e8e0f5;transition:background .15s" onmouseover="this.style.background='#f5f0ff'" onmouseout="this.style.background=''">
+              <span style="font-size:1.1rem">▶️</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(r.name)}</span>
+              <span style="font-size:.74rem;color:#9ab09a">${fmtDate(r.addedAt)}</span>
+              <span style="font-size:.85rem;color:#9ab09a">↗</span>
+            </a></li>`).join('')}</ul>`}
       </div>
     </section>` : '';
 
-  // ── Section: Ticketing ──
-  const tickSection = sections.ticketing && hub.ticketingUrl ? `
-    <section class="hub-section" id="ticketing">
-      <h2 class="section-title">🎫 Submit a Ticket</h2>
-      <div class="hub-card">
-        ${hub.ticketingNote ? `<p style="margin-bottom:16px;color:#4a7a44;font-size:.9rem;line-height:1.55">${escHtml(hub.ticketingNote)}</p>` : ''}
-        <a href="${escHtml(hub.ticketingUrl)}" target="_blank" rel="noopener" class="hub-btn-primary">Submit a Ticket ↗</a>
+  // ── Ticketing section ──
+  const tickHtml = sections.ticketing && hub.ticketingUrl ? `
+    <section id="ticketing" style="margin-bottom:40px">
+      <div style="font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a7a5a;margin-bottom:14px;border-left:4px solid #1679FA;padding-left:12px">🎫 Submit a Ticket</div>
+      <div style="background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(9,41,3,.07)">
+        ${hub.ticketingNote?`<p style="margin-bottom:16px;color:#4a7a44;font-size:.9rem;line-height:1.55">${escHtml(hub.ticketingNote)}</p>`:''}
+        <a href="${escHtml(hub.ticketingUrl)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:#092903;color:#32CE13;border-radius:10px;text-decoration:none;font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700">Submit a Ticket ↗</a>
       </div>
     </section>` : '';
 
-  // ── Section: Key Contacts (Full access only) ──
-  const pmCard = pm ? `
-    <div class="contact-card contact-card-pm">
-      <div class="contact-avatar contact-avatar-pm">${(pm.name || '?')[0].toUpperCase()}</div>
-      <div class="contact-info">
-        <div class="contact-name">${escHtml(pm.name)}</div>
-        <div class="contact-meta contact-role-pm">Project Manager</div>
-        ${pm.email ? `<a href="mailto:${escHtml(pm.email)}" class="contact-email">${escHtml(pm.email)}</a>` : ''}
+  // ── Contacts section ──
+  const pmCardHtml = pm ? `
+    <div style="display:flex;align-items:flex-start;gap:14px;padding:16px;background:#f0fdf4;border:1.5px solid #6ee7b7;border-radius:12px">
+      <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#092903,#1a6b08);color:#fff;font-family:'Fira Sans',sans-serif;font-size:1.1rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${(pm.name||'?')[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.9rem;font-weight:700;color:#092903">${escHtml(pm.name)}</div>
+        <div style="font-size:.75rem;color:#065f46;font-weight:700;margin-top:2px">Project Manager</div>
+        ${pm.email?`<a href="mailto:${escHtml(pm.email)}" style="font-size:.78rem;color:#1a6b08;text-decoration:none;margin-top:4px;display:block">${escHtml(pm.email)}</a>`:''}
       </div>
     </div>` : '';
 
-  const ctcSection = sections.contacts && canSee('contacts') && (pm || contacts.length > 0) ? `
-    <section class="hub-section" id="contacts">
-      <h2 class="section-title">📞 Key Contacts</h2>
-      <div class="hub-card">
-        <div class="contact-grid">
-          ${pmCard}
-          ${contacts.map(c => `
-            <div class="contact-card">
-              <div class="contact-avatar">${(c.name || '?')[0].toUpperCase()}</div>
-              <div class="contact-info">
-                <div class="contact-name">${escHtml(c.name)}</div>
-                ${c.position ? `<div class="contact-meta">${escHtml(c.position)}</div>` : ''}
-                ${c.projectRole ? `<div class="contact-meta" style="color:#8139EE">${escHtml(c.projectRole)}</div>` : ''}
-                ${c.email ? `<a href="mailto:${escHtml(c.email)}" class="contact-email">${escHtml(c.email)}</a>` : ''}
+  const ctcHtml = sections.contacts && canSee('contacts') && (pm || contacts.length > 0) ? `
+    <section id="contacts" style="margin-bottom:40px">
+      <div style="font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a7a5a;margin-bottom:14px;border-left:4px solid #f59e0b;padding-left:12px">📞 Key Contacts</div>
+      <div style="background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(9,41,3,.07)">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+          ${pmCardHtml}
+          ${contacts.map(c=>`
+            <div style="display:flex;align-items:flex-start;gap:14px;padding:16px;background:#f9fdf9;border:1px solid #e4ece4;border-radius:12px">
+              <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#8139EE,#32CE13);color:#fff;font-family:'Fira Sans',sans-serif;font-size:1.1rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${(c.name||'?')[0].toUpperCase()}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.9rem;font-weight:700;color:#092903">${escHtml(c.name)}</div>
+                ${c.position?`<div style="font-size:.75rem;color:#5a7a5a;margin-top:2px">${escHtml(c.position)}</div>`:''}
+                ${c.projectRole?`<div style="font-size:.75rem;color:#8139EE;font-weight:600;margin-top:2px">${escHtml(c.projectRole)}</div>`:''}
+                ${c.email?`<a href="mailto:${escHtml(c.email)}" style="font-size:.78rem;color:#1a6b08;text-decoration:none;margin-top:4px;display:block;word-break:break-all">${escHtml(c.email)}</a>`:''}
               </div>
             </div>`).join('')}
         </div>
@@ -378,194 +349,257 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>${escHtml(hub.projectTitle)} — Sprout Resource Hub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700;800&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700;800&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Rubik',sans-serif;background:#F7F9ED;color:#1a2e1a}
+    body{font-family:'Rubik',sans-serif;background:#f0f4f0;color:#1a2e1a;min-height:100vh}
     h1,h2,h3,h4,h5,h6{font-family:'Fira Sans',sans-serif}
 
-    /* ── Header ── */
-    header{background:linear-gradient(135deg,#092903 0%,#1a6b08 100%);color:#fff;padding:20px 40px;display:flex;align-items:center;gap:18px;box-shadow:0 4px 16px rgba(9,41,3,.35)}
-    .logo{height:72px;width:auto;flex-shrink:0;object-fit:contain}
+    header{background:linear-gradient(135deg,#092903 0%,#0d3d05 40%,#1a6b08 100%);color:#fff;padding:18px 36px;display:flex;align-items:center;gap:18px;box-shadow:0 4px 20px rgba(9,41,3,.4);position:sticky;top:0;z-index:100}
+    .logo{height:56px;width:auto;flex-shrink:0;object-fit:contain}
     .header-center{flex:1}
-    .header-project{font-size:1.3rem;font-weight:800;line-height:1.2}
-    .header-sub{font-size:.82rem;opacity:.75;margin-top:3px}
-    .header-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:.78rem;opacity:.8}
-    .header-badge{background:rgba(50,206,19,.2);border:1px solid rgba(50,206,19,.4);border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:700;letter-spacing:.3px;color:#32CE13}
+    .header-project{font-size:1.2rem;font-weight:800;line-height:1.2;letter-spacing:.01em}
+    .header-sub{font-size:.78rem;opacity:.7;margin-top:2px}
+    .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+    .header-pill{background:rgba(50,206,19,.25);border:1px solid rgba(50,206,19,.5);border-radius:20px;padding:3px 12px;font-size:.72rem;font-weight:700;color:#32CE13;letter-spacing:.3px}
 
-    /* ── Internal banner ── */
-    .internal-banner{background:#eafce6;border-bottom:2px solid #32CE13;padding:11px 40px;font-size:.85rem;color:#092903}
-    .internal-banner strong{font-weight:700}
+    nav.hub-nav{background:#fff;border-bottom:1px solid #dce8d8;padding:0 36px;display:flex;gap:0;overflow-x:auto;box-shadow:0 1px 4px rgba(9,41,3,.06)}
+    nav.hub-nav a{display:inline-flex;align-items:center;gap:6px;padding:13px 16px;font-family:'Fira Sans',sans-serif;font-size:.82rem;font-weight:600;color:#6a8a6a;text-decoration:none;border-bottom:2.5px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+    nav.hub-nav a:hover,nav.hub-nav a.active{color:#092903;border-bottom-color:#32CE13}
 
-    /* ── Nav ── */
-    .hub-nav{background:#fff;border-bottom:1px solid #d4e8d0;padding:0 40px;display:flex;gap:0;overflow-x:auto}
-    .hub-nav a{display:inline-flex;align-items:center;gap:6px;padding:14px 18px;font-family:'Fira Sans',sans-serif;font-size:.83rem;font-weight:600;color:#5a7a5a;text-decoration:none;border-bottom:2.5px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
-    .hub-nav a:hover{color:#092903;border-bottom-color:#32CE13}
+    .hub-main{max-width:1100px;margin:0 auto;padding:28px 28px 60px}
 
-    /* ── Main layout ── */
-    main{max-width:980px;margin:36px auto;padding:0 24px 60px}
+    /* ── Stat tiles ── */
+    .stat-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+    .stat-tile{border-radius:14px;padding:20px 22px;color:#fff;position:relative;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+    .stat-tile-icon{position:absolute;right:16px;top:14px;font-size:2rem;opacity:.22}
+    .stat-tile-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;opacity:.85;margin-bottom:6px}
+    .stat-tile-value{font-size:1.5rem;font-weight:800;line-height:1;font-family:'Fira Sans',sans-serif}
+    .stat-tile-sub{font-size:.75rem;opacity:.8;margin-top:5px}
 
-    /* ── Section ── */
-    .hub-section{margin-bottom:44px}
-    .section-title{font-family:'Fira Sans',sans-serif;font-size:.95rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#5a7a5a;margin-bottom:16px;border-left:4px solid #32CE13;padding-left:12px}
+    /* ── Dashboard grid ── */
+    .dash-grid{display:grid;grid-template-columns:1fr 320px;gap:20px;margin-bottom:32px;align-items:start}
 
-    /* ── Card ── */
-    .hub-card{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(9,41,3,.07)}
-    .hub-empty{color:#8aaa8a;font-size:.88rem;padding:20px 24px}
-    .hub-empty-inner{text-align:center;color:#8aaa8a;font-size:.88rem;padding:16px 0}
+    /* ── Chart card ── */
+    .chart-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(9,41,3,.08)}
+    .chart-card-title{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#5a7a5a;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+    .chart-card-title::before{content:'';display:inline-block;width:4px;height:16px;background:#32CE13;border-radius:2px}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+    .donut-pct{font-family:'Fira Sans',sans-serif;font-size:2rem;font-weight:800;color:#092903;line-height:1}
+    .donut-lbl{font-size:.72rem;color:#8aaa8a;font-weight:600;margin-top:2px}
 
-    /* ── Project overview ── */
-    .overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:0}
-    .overview-stat{background:#f5fcf4;border:1px solid #d4e8d0;border-radius:10px;padding:14px 18px}
-    .overview-stat-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a7a5a;margin-bottom:4px}
-    .overview-stat-value{font-size:1.05rem;font-weight:700;color:#092903}
+    /* ── Timeline zigzag ── */
+    .timeline-section{background:#fff;border-radius:16px;padding:28px 24px;box-shadow:0 2px 12px rgba(9,41,3,.08);margin-bottom:32px}
+    .timeline-header{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#5a7a5a;margin-bottom:24px;display:flex;align-items:center;gap:8px}
+    .timeline-header::before{content:'';display:inline-block;width:4px;height:16px;background:#1679FA;border-radius:2px}
 
-    /* ── Progress bar ── */
-    .progress-header{display:flex;justify-content:space-between;margin-bottom:8px}
-    .progress-label{font-size:.82rem;color:#5a7a5a}
-    .progress-value{font-size:.82rem;font-weight:700;color:#092903}
-    .hub-progress-wrap{height:10px;background:#e4f0e4;border-radius:20px;overflow:hidden;margin-bottom:20px}
-    .hub-progress-bar{height:100%;background:linear-gradient(90deg,#32CE13,#1a6b08);border-radius:20px;transition:width .4s}
+    @keyframes pulse-dot{0%,100%{box-shadow:0 0 0 4px #fef3c7}50%{box-shadow:0 0 0 8px #fef9c3}}
+    @keyframes pulse-badge{0%,100%{opacity:1}50%{opacity:.7}}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .hub-main>*{animation:fadeInUp .4s ease both}
+    .hub-main>*:nth-child(1){animation-delay:.05s}
+    .hub-main>*:nth-child(2){animation-delay:.1s}
+    .hub-main>*:nth-child(3){animation-delay:.15s}
+    .hub-main>*:nth-child(4){animation-delay:.2s}
 
-    /* ── Milestones ── */
-    .ms-list{display:flex;flex-direction:column;gap:8px}
-    .ms-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;border:1.5px solid #e4ece4;transition:all .15s}
-    .ms-done{background:#f0fdf4;border-color:#86efac}
-    .ms-current{background:#fffbeb;border-color:#fcd34d}
-    .ms-pending{background:#fafafa;border-color:#e4ece4}
-    .ms-check-wrap{width:28px;text-align:center;flex-shrink:0}
-    .ms-check-icon{color:#16a34a;font-weight:700;font-size:1rem}
-    .ms-cur-icon{color:#d97706;font-size:.9rem}
-    .ms-pend-icon{color:#9ca3af;font-size:.85rem}
-    .ms-info{flex:1;min-width:0}
-    .ms-name{font-size:.88rem;font-weight:600;color:#092903}
-    .ms-date{font-size:.74rem;color:#8aaa8a;margin-top:2px}
-    .ms-date-actual{font-size:.74rem;color:#16a34a;font-weight:600;margin-top:2px}
-    .ms-badge{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;white-space:nowrap}
-    .ms-badge-done{background:#d1fae5;color:#065f46}
-    .ms-badge-cur{background:#fef3c7;color:#92400e}
-    .ms-badge-pend{background:#f3f4f6;color:#6b7280}
-
-    /* ── Timeline table ── */
-    .hub-table{width:100%;border-collapse:collapse;font-size:.85rem}
-    .hub-table th{padding:10px 14px;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a7a5a;border-bottom:2px solid #e4ece4;background:#f9fdf9}
-    .hub-table td{padding:11px 14px;border-bottom:1px solid #f0f5f0;color:#1a2e1a}
-    .hub-table tr:last-child td{border-bottom:none}
-    .hub-table tr.tl-done td{background:#f0fdf4}
-    .hub-table tr.tl-cur td{background:#fffbeb}
-    .tl-badge{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
-    .tl-badge-done{background:#d1fae5;color:#065f46}
-    .tl-badge-cur{background:#fef3c7;color:#92400e}
-    .tl-badge-pend{background:#f3f4f6;color:#6b7280}
-
-    /* ── Link list ── */
-    .hub-link-list{list-style:none;display:flex;flex-direction:column;gap:6px}
-    .hub-link-list li a{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;text-decoration:none;color:#1a6b08;font-weight:500;font-size:.9rem;transition:background .15s;border:1px solid #e4ece4}
-    .hub-link-list li a:hover{background:#eafce6;color:#092903}
-    .link-icon{font-size:1.1rem;flex-shrink:0}
-    .link-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .link-meta{font-size:.74rem;color:#9ab09a;flex-shrink:0}
-    .link-arrow{font-size:.85rem;color:#9ab09a;flex-shrink:0}
-
-    /* ── Contacts ── */
-    .contact-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
-    .contact-card{display:flex;align-items:flex-start;gap:14px;padding:16px;background:#f9fdf9;border:1px solid #e4ece4;border-radius:12px}
-    .contact-card-pm{background:#f0fdf4;border:1.5px solid #6ee7b7}
-    .contact-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#8139EE,#32CE13);color:#fff;font-family:'Fira Sans',sans-serif;font-size:1rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-transform:uppercase}
-    .contact-avatar-pm{background:linear-gradient(135deg,#092903,#1a6b08)}
-    .contact-role-pm{color:#065f46;font-weight:700}
-    .contact-info{flex:1;min-width:0}
-    .contact-name{font-size:.9rem;font-weight:700;color:#092903}
-    .contact-meta{font-size:.76rem;color:#5a7a5a;margin-top:2px}
-    .contact-email{font-size:.78rem;color:#1a6b08;text-decoration:none;margin-top:4px;display:block;word-break:break-all}
-    .contact-email:hover{text-decoration:underline}
-
-    /* ── Button ── */
-    .hub-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:#092903;color:#32CE13;border-radius:10px;text-decoration:none;font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700;transition:background .2s}
-    .hub-btn-primary:hover{background:#1a6b08}
-
-    /* ── Footer ── */
-    footer{text-align:center;padding:28px;font-size:.8rem;color:#8aaa8a;border-top:1px solid #d4e8d0}
+    footer{text-align:center;padding:24px;font-size:.78rem;color:#8aaa8a;border-top:1px solid #dce8d8;background:#fff}
     .footer-brand{color:#32CE13;font-family:'Fira Sans',sans-serif;font-weight:800}
 
-    @media(max-width:600px){
-      header{padding:16px 20px}
-      .hub-nav{padding:0 16px}
-      main{padding:0 16px 40px}
-      .hub-table{font-size:.78rem}
-      .hub-table th,.hub-table td{padding:8px 10px}
+    @media(max-width:768px){
+      header{padding:14px 18px}
+      .hub-main{padding:16px 14px 48px}
+      .stat-tiles{grid-template-columns:repeat(2,1fr);gap:10px}
+      .stat-tile-value{font-size:1.2rem}
+      .dash-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:480px){
+      .stat-tiles{grid-template-columns:1fr 1fr}
+      nav.hub-nav{padding:0 12px}
+      nav.hub-nav a{padding:11px 10px;font-size:.76rem}
     }
   </style>
 </head>
 <body>
 
 <header>
-  <img class="logo" src="/Sprout%20Logo.png" alt="Sprout Solutions" />
+  <img class="logo" src="/Sprout%20Logo.png" alt="Sprout Solutions"/>
   <div class="header-center">
     <div class="header-project">${escHtml(hub.projectTitle)}</div>
-    <div class="header-sub">Implementation Resource Hub</div>
+    <div class="header-sub">Implementation Resource Hub &nbsp;·&nbsp; ${fmtDate(new Date().toISOString())}</div>
   </div>
-  <div class="header-meta">
-    ${pm ? `<span>PM: ${escHtml(pm.name)}</span>` : ''}
-    <span>${fmtDate(new Date().toISOString())}</span>
-    <span class="header-badge">${progress}% Complete</span>
-    ${!isInternalUser ? `<a href="/hub/${escHtml(hub.slug)}/logout" style="font-size:.72rem;color:rgba(255,255,255,.65);text-decoration:underline;margin-top:2px">Sign out</a>` : ''}
+  <div class="header-right">
+    ${pm ? `<span style="font-size:.78rem;opacity:.8">PM: ${escHtml(pm.name)}</span>` : ''}
+    <span class="header-pill">${progress}% Complete</span>
+    ${!isInternalUser ? `<a href="/hub/${escHtml(hub.slug)}/logout" style="font-size:.7rem;color:rgba(255,255,255,.55);text-decoration:underline;margin-top:1px">Sign out</a>` : ''}
   </div>
 </header>
 
 ${adminBanner}
 
 <nav class="hub-nav">
-  ${sections.milestones ? '<a href="#milestones">🏁 Milestones</a>' : ''}
-  ${sections.timeline   ? '<a href="#timeline">📅 Timeline</a>'     : ''}
+  <a href="#overview">📊 Overview</a>
+  ${sections.milestones||sections.timeline ? '<a href="#timeline">🗺️ Milestones</a>' : ''}
   ${sections.documents  ? '<a href="#documents">📄 Documents</a>'   : ''}
   ${sections.recordings && canSee('recordings') ? '<a href="#recordings">🎬 Recordings</a>' : ''}
   ${sections.ticketing && hub.ticketingUrl ? '<a href="#ticketing">🎫 Ticketing</a>' : ''}
-  ${sections.contacts && canSee('contacts') && contacts.length > 0 ? '<a href="#contacts">📞 Contacts</a>' : ''}
+  ${sections.contacts && canSee('contacts') && (pm||contacts.length>0) ? '<a href="#contacts">📞 Contacts</a>' : ''}
 </nav>
 
-<main>
-  <!-- Overview stat bar -->
-  <section class="hub-section" style="margin-top:0;margin-bottom:32px">
-    <div class="hub-card">
-      <div class="overview-grid">
-        <div class="overview-stat">
-          <div class="overview-stat-label">Project</div>
-          <div class="overview-stat-value" style="font-size:.92rem">${escHtml(hub.projectTitle)}</div>
-        </div>
-        ${pm ? `<div class="overview-stat"><div class="overview-stat-label">Project Manager</div><div class="overview-stat-value" style="font-size:.92rem">${escHtml(pm.name)}</div></div>` : ''}
-        <div class="overview-stat">
-          <div class="overview-stat-label">Status</div>
-          <div class="overview-stat-value" style="font-size:.92rem;text-transform:capitalize">${escHtml(project?.status || '—')}</div>
-        </div>
-        <div class="overview-stat">
-          <div class="overview-stat-label">Milestones Done</div>
-          <div class="overview-stat-value">${completedCount} / ${MILESTONES.length}</div>
-        </div>
-        <div class="overview-stat">
-          <div class="overview-stat-label">Overall Progress</div>
-          <div class="overview-stat-value" style="color:#16a34a">${progress}%</div>
-        </div>
+<div class="hub-main">
+
+  <!-- ── Stat Tiles ── -->
+  <div class="stat-tiles" id="overview">
+    <div class="stat-tile" style="background:linear-gradient(135deg,#16a34a,#15803d)">
+      <div class="stat-tile-icon">📊</div>
+      <div class="stat-tile-label">Overall Progress</div>
+      <div class="stat-tile-value">${progress}%</div>
+      <div class="stat-tile-sub">${completedCount} of ${MILESTONES.length} milestones done</div>
+    </div>
+    <div class="stat-tile" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+      <div class="stat-tile-icon">👤</div>
+      <div class="stat-tile-label">Project Manager</div>
+      <div class="stat-tile-value" style="font-size:1.05rem;line-height:1.3">${escHtml(pm?.name||'—')}</div>
+      <div class="stat-tile-sub">${pm?.email ? escHtml(pm.email) : 'Sprout Solutions'}</div>
+    </div>
+    <div class="stat-tile" style="background:linear-gradient(135deg,#0891b2,#0e7490)">
+      <div class="stat-tile-icon">🏁</div>
+      <div class="stat-tile-label">Milestones Done</div>
+      <div class="stat-tile-value">${completedCount} <span style="font-size:1rem;opacity:.7">/ ${MILESTONES.length}</span></div>
+      <div class="stat-tile-sub">${pendingCount} remaining</div>
+    </div>
+    <div class="stat-tile" style="background:linear-gradient(135deg,#d97706,#b45309)">
+      <div class="stat-tile-icon">📌</div>
+      <div class="stat-tile-label">Project Status</div>
+      <div class="stat-tile-value" style="font-size:1.1rem;text-transform:capitalize">${statusLabel(project?.status)}</div>
+      <div class="stat-tile-sub">Implementation stage</div>
+    </div>
+  </div>
+
+  <!-- ── Dashboard Grid: Chart + Donut ── -->
+  <div class="dash-grid" id="timeline">
+
+    <!-- Left: Timeline Zigzag -->
+    <div class="timeline-section">
+      <div class="timeline-header">🗺️ Project Milestone Timeline</div>
+      <div style="position:relative">
+        <!-- vertical center line -->
+        <div style="position:absolute;left:50%;top:18px;bottom:18px;width:2px;background:linear-gradient(to bottom,#d1fae5,#e4ece4);transform:translateX(-50%);z-index:0"></div>
+        ${msZigzag}
       </div>
     </div>
-  </section>
 
-  ${msSection}
-  ${tlSection}
-  ${docsSection}
-  ${recSection}
-  ${tickSection}
-  ${ctcSection}
-</main>
+    <!-- Right: Donut chart -->
+    <div>
+      <div class="chart-card" style="margin-bottom:20px">
+        <div class="chart-card-title">Progress Overview</div>
+        <div style="position:relative;height:220px;display:flex;align-items:center;justify-content:center">
+          <canvas id="hub-donut-chart"></canvas>
+          <div class="donut-center">
+            <div class="donut-pct">${progress}%</div>
+            <div class="donut-lbl">Complete</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:16px;margin-top:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block"></span>Done (${completedCount})</div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block"></span>In Progress (${completedCount < MILESTONES.length ? 1 : 0})</div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#e5e7eb;display:inline-block"></span>Pending (${pendingCount})</div>
+        </div>
+      </div>
+
+      <!-- Mini stat card -->
+      <div class="chart-card">
+        <div class="chart-card-title">Timeline Summary</div>
+        ${MILESTONES.map((m, i) => {
+          const done = !!milestones[m];
+          const isCur = !done && MILESTONES.slice(0,i).every(p=>milestones[p]);
+          const target = timeline[m]?.targetDate;
+          if (!done && !isCur) return '';
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f5f0">
+            <div style="width:8px;height:8px;border-radius:50%;background:${done?'#16a34a':'#d97706'};flex-shrink:0"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.78rem;font-weight:600;color:#092903;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(m)}</div>
+              ${target?`<div style="font-size:.7rem;color:#8aaa8a">Target: ${fmtDate(target)}</div>`:''}
+            </div>
+            <span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${done?'#d1fae5':'#fef3c7'};color:${done?'#065f46':'#92400e'};flex-shrink:0">${done?'Done':'Active'}</span>
+          </div>`;
+        }).filter(Boolean).join('')}
+        ${completedCount === 0 ? '<div style="font-size:.82rem;color:#8aaa8a;text-align:center;padding:12px 0">No milestones completed yet.</div>' : ''}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Lower sections ── -->
+  ${docsHtml}
+  ${recHtml}
+  ${tickHtml}
+  ${ctcHtml}
+
+</div>
 
 <footer>
   <p><span class="footer-brand">Sprout Solutions</span> &mdash; Implementation Resource Hub &mdash; Data refreshes automatically on every visit.</p>
 </footer>
 
+<script>
+  // ── Donut chart ──
+  (function() {
+    const ctx = document.getElementById('hub-donut-chart');
+    if (!ctx) return;
+    const done    = ${completedCount};
+    const inProg  = ${completedCount < MILESTONES.length ? 1 : 0};
+    const pending = ${pendingCount};
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Completed', 'In Progress', 'Pending'],
+        datasets: [{
+          data: [done, inProg, pending],
+          backgroundColor: ['#16a34a', '#d97706', '#e5e7eb'],
+          borderWidth: 3,
+          borderColor: '#fff',
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        cutout: '72%',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: c => ' ' + c.label + ': ' + c.parsed + ' milestone' + (c.parsed !== 1 ? 's' : ''),
+            },
+          },
+        },
+        animation: { animateRotate: true, duration: 900 },
+      },
+    });
+  })();
+
+  // ── Scrollspy nav ──
+  (function() {
+    const links  = document.querySelectorAll('nav.hub-nav a');
+    const ids    = [...links].map(a => a.getAttribute('href').replace('#',''));
+    const secs   = ids.map(id => document.getElementById(id)).filter(Boolean);
+    const onScroll = () => {
+      const scrollY = window.scrollY + 80;
+      let active = ids[0];
+      secs.forEach((s, i) => { if (s && s.offsetTop <= scrollY) active = ids[i]; });
+      links.forEach(a => {
+        const key = a.getAttribute('href').replace('#','');
+        a.classList.toggle('active', key === active);
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+</script>
 </body>
 </html>`;
 }
