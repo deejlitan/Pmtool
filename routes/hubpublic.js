@@ -238,21 +238,22 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
   const msZigzag = MILESTONES.map((m, i) => {
     const done      = !!milestones[m];
     const isCurrent = !done && MILESTONES.slice(0, i).every(prev => milestones[prev]);
-    const target    = timeline[m]?.endDate || timeline[m]?.targetDate;
-    const actual    = timeline[m]?.actualDate || (done ? serverToday : '');
-    const isLeft    = i % 2 === 0;
-    const dotColor  = done ? '#16a34a' : isCurrent ? '#d97706' : '#d1d5db';
-    const dotIcon   = done ? '✓' : isCurrent ? '▶' : String(i + 1);
-    const cardBg    = done ? '#f0fdf4' : isCurrent ? '#fffbeb' : '#fff';
-    const cardBorder= done ? '#86efac' : isCurrent ? '#fcd34d' : '#e4ece4';
-    const badge     = done
+    const targetStart = timeline[m]?.startDate;
+    const targetEnd   = timeline[m]?.endDate || timeline[m]?.targetDate;
+    const actual      = timeline[m]?.actualDate || (done ? serverToday : '');
+    const isLeft      = i % 2 === 0;
+    const dotColor    = done ? '#16a34a' : isCurrent ? '#d97706' : '#d1d5db';
+    const dotIcon     = done ? '✓' : isCurrent ? '▶' : String(i + 1);
+    const cardBg      = done ? '#f0fdf4' : isCurrent ? '#fffbeb' : '#fff';
+    const cardBorder  = done ? '#86efac' : isCurrent ? '#fcd34d' : '#e4ece4';
+    const badge       = done
       ? `<span style="font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:20px;background:#d1fae5;color:#065f46">✓ Completed</span>`
       : isCurrent
         ? `<span style="font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:20px;background:#fef3c7;color:#92400e;animation:pulse-badge 2s infinite">▶ In Progress</span>`
         : `<span style="font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:20px;background:#f3f4f6;color:#6b7280">Pending</span>`;
-    const dateHtml  = done
-      ? `${target ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:3px">🎯 Target: ${fmtDate(target)}</div>` : ''}<div style="font-size:.72rem;color:#16a34a;font-weight:600;margin-top:2px">✅ Completed: ${fmtDate(actual)}</div>`
-      : target ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:3px">🎯 Target: ${fmtDate(target)}</div>` : '';
+    const dateHtml    = done
+      ? `${targetStart ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:3px">📅 Start: ${fmtDate(targetStart)}</div>` : ''}${targetEnd ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:2px">🎯 Target: ${fmtDate(targetEnd)}</div>` : ''}<div style="font-size:.72rem;color:#16a34a;font-weight:600;margin-top:2px">✅ Completed: ${fmtDate(actual)}</div>`
+      : `${targetStart ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:3px">📅 Start: ${fmtDate(targetStart)}</div>` : ''}${targetEnd ? `<div style="font-size:.72rem;color:#8aaa8a;margin-top:2px">🎯 Target: ${fmtDate(targetEnd)}</div>` : ''}`;
     const card = `
       <div style="background:${cardBg};border:1.5px solid ${cardBorder};border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(9,41,3,.06);max-width:340px;${isLeft?'margin-left:auto;margin-right:24px':'margin-left:24px;margin-right:auto'}">
         <div style="font-size:.88rem;font-weight:700;color:#092903;margin-bottom:4px">${escHtml(m)}</div>
@@ -517,13 +518,15 @@ ${adminBanner}
         ${MILESTONES.map((m, i) => {
           const done = !!milestones[m];
           const isCur = !done && MILESTONES.slice(0,i).every(p=>milestones[p]);
-          const target = timeline[m]?.targetDate;
+          const tStart = timeline[m]?.startDate;
+          const tEnd   = timeline[m]?.endDate || timeline[m]?.targetDate;
           if (!done && !isCur) return '';
           return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f5f0">
             <div style="width:8px;height:8px;border-radius:50%;background:${done?'#16a34a':'#d97706'};flex-shrink:0"></div>
             <div style="flex:1;min-width:0">
               <div style="font-size:.78rem;font-weight:600;color:#092903;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(m)}</div>
-              ${target?`<div style="font-size:.7rem;color:#8aaa8a">Target: ${fmtDate(target)}</div>`:''}
+              ${tStart?`<div style="font-size:.7rem;color:#8aaa8a">Start: ${fmtDate(tStart)}</div>`:''}
+              ${tEnd?`<div style="font-size:.7rem;color:#8aaa8a">Target: ${fmtDate(tEnd)}</div>`:''}
             </div>
             <span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${done?'#d1fae5':'#fef3c7'};color:${done?'#065f46':'#92400e'};flex-shrink:0">${done?'Done':'Active'}</span>
           </div>`;

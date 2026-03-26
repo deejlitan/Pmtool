@@ -1,13 +1,14 @@
 const express = require('express');
 const router  = express.Router();
-const { getTimelineTemplates, saveTimelineTemplates } = require('../db');
+const { getTimelineTemplates, saveTimelineTemplates, getUsers } = require('../db');
 
 function requireAuth(req, res, next) {
   if (!req.session?.userId) return res.status(401).json({ error: 'Not authenticated' });
   next();
 }
 function requireAdmin(req, res, next) {
-  if (req.session?.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+  const user = getUsers().find(u => u.id === req.session.userId);
+  if (!user || user.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
   next();
 }
 

@@ -167,15 +167,32 @@ function buildPlanningRows(timeline, milestones, isReadOnly, phases) {
       </div>`;
 
     // Sub-task rows
-    phase.tasks.forEach(task => {
+    const taskDateCss = `font-size:.7rem;padding:.2rem .35rem;border:1px solid #c5d8c1;border-radius:5px;background:rgba(255,255,255,.92);color:#374151;width:100px`;
+    phase.tasks.forEach((task, ti) => {
       const indent = task.indent || 0;
       const pl     = 14 + indent * 18;
       const isHdr  = !task.duration && !task.assignedTo;
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.28rem .9rem .28rem ${pl}px;background:${rowBg};border-top:1px solid #e4ece4">
-        <span style="font-size:.77rem;font-weight:${isHdr?'600':'400'};color:${isHdr?'#166534':'#374151'};flex:1">${task.label}</span>
-        ${task.duration !== '' && task.duration != null ? `<span style="font-size:.68rem;color:#6b7280;white-space:nowrap">${task.duration}d</span>` : ''}
-        ${task.assignedTo ? `<span style="font-size:.65rem;background:#e4ece4;color:#374151;padding:1px 6px;border-radius:8px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis">${task.assignedTo}</span>` : ''}
-      </div>`;
+
+      if (isCustom) {
+        // Custom template: centered assignedTo + per-task Start/End date inputs
+        const taskKey  = key + '_t' + ti;
+        const tStart   = timeline[taskKey]?.startDate || '';
+        const tEnd     = timeline[taskKey]?.endDate || timeline[taskKey]?.targetDate || '';
+        html += `<div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:.4rem;align-items:center;padding:.3rem .9rem .3rem ${pl}px;background:${rowBg};border-top:1px solid #e4ece4">
+          <span style="font-size:.77rem;font-weight:${isHdr?'600':'400'};color:${isHdr?'#166534':'#374151'}">${task.label}</span>
+          ${task.assignedTo ? `<span style="font-size:.63rem;background:#e4ece4;color:#374151;padding:1px 7px;border-radius:8px;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;text-align:center">${task.assignedTo}</span>` : '<span></span>'}
+          ${task.duration !== '' && task.duration != null ? `<span style="font-size:.68rem;color:#6b7280;white-space:nowrap">${task.duration}d</span>` : '<span></span>'}
+          <input type="date" class="plan-start" data-milestone="${taskKey}" value="${tStart}" ${isReadOnly ? 'disabled' : ''} style="${taskDateCss}" />
+          <input type="date" class="plan-end" data-milestone="${taskKey}" value="${tEnd}" ${isReadOnly ? 'disabled' : ''} style="${taskDateCss}" />
+        </div>`;
+      } else {
+        // Built-in template: display-only
+        html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.28rem .9rem .28rem ${pl}px;background:${rowBg};border-top:1px solid #e4ece4">
+          <span style="font-size:.77rem;font-weight:${isHdr?'600':'400'};color:${isHdr?'#166534':'#374151'};flex:1">${task.label}</span>
+          ${task.duration !== '' && task.duration != null ? `<span style="font-size:.68rem;color:#6b7280;white-space:nowrap">${task.duration}d</span>` : ''}
+          ${task.assignedTo ? `<span style="font-size:.65rem;background:#e4ece4;color:#374151;padding:1px 6px;border-radius:8px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis">${task.assignedTo}</span>` : ''}
+        </div>`;
+      }
     });
 
     html += `</div>`;
@@ -207,6 +224,36 @@ function buildPlanningRows(timeline, milestones, isReadOnly, phases) {
   }
 
   return html;
+}
+
+// ── Sync custom template phase dates → system milestone targets ─
+// For custom templates (no milestone mapping), copy each phase's last task
+// end date to the corresponding system milestone by index so Progress
+// Tracking can show the correct Target date.
+function syncTemplateToMilestones(updatedTimeline, phases) {
+  if (!phases) return; // built-in template — milestone keys already match
+  phases.forEach((phase, idx) => {
+    if (phase.milestone) return; // has explicit mapping — already handled
+    const phaseKey = phase.key || phase.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    // Start from last task and find the most recent end date entered
+    let lastEnd = updatedTimeline[phaseKey]?.endDate || updatedTimeline[phaseKey]?.targetDate || '';
+    for (let ti = (phase.tasks || []).length - 1; ti >= 0; ti--) {
+      const tk = phaseKey + '_t' + ti;
+      const te = updatedTimeline[tk]?.endDate || updatedTimeline[tk]?.targetDate || '';
+      if (te) { lastEnd = te; break; }
+    }
+    // Also grab the phase start date
+    const phaseStart = updatedTimeline[phaseKey]?.startDate || '';
+    // Write to corresponding system milestone so Progress Tracking sees it
+    const sysMs = MILESTONES[idx];
+    if (sysMs && (lastEnd || phaseStart)) {
+      updatedTimeline[sysMs] = {
+        ...(updatedTimeline[sysMs] || {}),
+        ...(phaseStart ? { startDate: phaseStart } : {}),
+        ...(lastEnd    ? { endDate: lastEnd, targetDate: lastEnd } : {}),
+      };
+    }
+  });
 }
 
 // ── Parse uploaded Excel file into timeline template phases ───
@@ -251,20 +298,30 @@ function parseTimelineTemplateFile(file, callback) {
 // ── Download the blank Excel import format for admins ─────────
 function downloadTimelineTemplateFormat() {
   const data = [
-    ['ROW_TYPE', 'LABEL', 'INDENT (0/1/2)', 'DURATION (DAYS)', 'ASSIGNED TO'],
-    ['PHASE', 'PHASE 1: KICK OFF MEETING', '', '', ''],
-    ['TASK', 'Introduction', '0', '1', 'SPROUT'],
-    ['TASK', 'Project Timeline', '0', '1', 'SPROUT'],
-    ['TASK', 'HR Policy Questionnaire', '0', '', 'SPROUT AND CLIENT'],
-    ['PHASE', 'PHASE 2: DATA GATHERING', '', '', ''],
-    ['TASK', 'Account Creation', '0', '3', 'SPROUT'],
-    ['TASK', 'Data Submission', '0', '', 'CLIENT'],
-    ['TASK', 'Masterfile', '1', '4', 'CLIENT'],
-    ['TASK', 'Payroll Registers', '1', '', 'CLIENT'],
+    ['ROW_TYPE', 'LABEL', 'INDENT (0/1/2)', 'DURATION (DAYS)', 'ASSIGNED TO', 'TARGET START DATE', 'TARGET END DATE', 'STATUS', 'REMARKS'],
+    ['PHASE', 'PHASE 1: KICK OFF MEETING', '', '', '', '', '', '', ''],
+    ['TASK', 'Introduction', '0', '1', 'SPROUT', '', '', 'NOT STARTED', ''],
+    ['TASK', 'Project Timeline', '0', '1', 'SPROUT', '', '', 'NOT STARTED', ''],
+    ['TASK', 'HR Policy Questionnaire', '0', '', 'SPROUT AND CLIENT', '', '', 'NOT STARTED', ''],
+    ['PHASE', 'PHASE 2: DATA GATHERING', '', '', '', '', '', '', ''],
+    ['TASK', 'Account Creation', '0', '3', 'SPROUT', '', '', 'NOT STARTED', ''],
+    ['TASK', 'Data Submission', '0', '', 'CLIENT', '', '', 'NOT STARTED', ''],
+    ['TASK', 'Masterfile', '1', '4', 'CLIENT', '', '', 'NOT STARTED', ''],
+    ['TASK', 'Payroll Registers', '1', '', 'CLIENT', '', '', 'NOT STARTED', ''],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 12 }, { wch: 45 }, { wch: 16 }, { wch: 16 }, { wch: 30 }];
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 45 }, { wch: 16 }, { wch: 16 }, { wch: 30 },
+    { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 28 },
+  ];
+  // Dropdown validation on column H (STATUS) for all data rows
+  ws['!dataValidation'] = [{
+    sqref: 'H2:H1000',
+    type: 'list',
+    formula1: '"NOT STARTED,COMPLETED,ONGOING"',
+    showDropDown: false,
+  }];
   XLSX.utils.book_append_sheet(wb, ws, 'Import Format');
   XLSX.writeFile(wb, 'timeline-template-import-format.xlsx');
 }
@@ -390,8 +447,18 @@ function openAddTimelineTemplateModal(onSaved) {
 
   // Save
   backdrop.querySelector('#atpl-save').addEventListener('click', async () => {
-    const name = backdrop.querySelector('#atpl-name').value.trim();
-    if (!name || !parsedPhases) return;
+    const name    = backdrop.querySelector('#atpl-name').value.trim();
+    const nameInp = backdrop.querySelector('#atpl-name');
+    if (!name) {
+      nameInp.style.borderColor = '#dc2626';
+      nameInp.focus();
+      const errEl = backdrop.querySelector('#atpl-error');
+      errEl.style.display = 'block';
+      errEl.textContent   = 'Please enter a template name before saving.';
+      return;
+    }
+    nameInp.style.borderColor = '';
+    if (!parsedPhases) return;
     const saveBtn = backdrop.querySelector('#atpl-save');
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
@@ -5024,13 +5091,14 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
 
     // Milestones tab rows
     const progressRows = MILESTONES.map((m, i) => {
-      const done       = !!milestones[m];
-      const locked     = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
-      const disabled   = isReadOnly || locked;
-      const targetDate = timeline[m]?.targetDate || '';
-      const actualDate = timeline[m]?.actualDate || (done ? today : '');
+      const done        = !!milestones[m];
+      const locked      = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
+      const disabled    = isReadOnly || locked;
+      const targetStart = timeline[m]?.startDate || '';
+      const targetEnd   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
+      const actualDate  = timeline[m]?.actualDate || (done ? today : '');
       return `
-        <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
+        <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
           <input type="checkbox" class="ms-check" data-index="${i}" data-milestone="${m}"
             ${done ? 'checked' : ''} ${disabled ? 'disabled' : ''}
             style="width:15px;height:15px;accent-color:var(--primary);cursor:${disabled ? 'not-allowed' : 'pointer'}" />
@@ -5038,7 +5106,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
             <span style="font-size:.72rem;color:var(--txt-muted);font-weight:600;margin-right:.3rem">${i + 1}.</span>
             <span class="ms-label" style="font-size:.85rem;${done ? 'text-decoration:line-through;color:var(--txt-muted)' : 'font-weight:500'}">${m}</span>
           </div>
-          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetDate || '—'}</div>
+          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetStart || '—'}</div>
+          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetEnd || '—'}</div>
           <div style="font-size:.78rem;color:${done ? '#16a34a' : 'var(--txt-muted)'};text-align:center">
             <span class="ms-actual-display">${actualDate || '—'}</span>
             <input type="hidden" class="ms-actual" data-milestone="${m}" value="${actualDate}" />
@@ -5115,8 +5184,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
           </div>
           <div class="progress-bar-wrap" style="height:10px"><div class="progress-bar" id="pf-ms-progress-bar" style="width:${progress}%"></div></div>
         </div>
-        <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
-          <div></div><div>Milestone</div><div style="text-align:center">Target</div><div style="text-align:center">Actual</div><div></div>
+        <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
+          <div></div><div>Milestone</div><div style="text-align:center">Target Start</div><div style="text-align:center">Target End</div><div style="text-align:center">Actual</div><div></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:.35rem" id="pf-ms-list">${progressRows}</div>
         <div class="modal-actions" style="margin-top:1.2rem">
@@ -5307,6 +5376,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
           updatedMilestones[m] = done;
           const actualInput = modal.querySelector(`.ms-actual[data-milestone="${m}"]`);
           updatedTimeline[m] = {
+            startDate:  timeline[m]?.startDate  || '',
+            endDate:    timeline[m]?.endDate    || '',
             targetDate: timeline[m]?.targetDate || '',
             actualDate: done ? (actualInput?.value || timeline[m]?.actualDate || today) : '',
           };
@@ -5326,6 +5397,7 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       // Save timeline dates
       modal.querySelector('#pf-tl-save-btn')?.addEventListener('click', () => {
         const updatedTimeline = collectTimeline();
+        syncTemplateToMilestones(updatedTimeline, getPfActivePhases());
         const list = getProjects();
         const idx  = list.findIndex(x => x.id === projectId);
         list[idx].timeline         = updatedTimeline;
@@ -8053,13 +8125,14 @@ function openMilestonesModal(projectId) {
 
   // ── Tab 2: Progress Tracking rows ─────────────────────────────
   const progressRows = MILESTONES.map((m, i) => {
-    const done       = !!milestones[m];
-    const locked     = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
-    const disabled   = isReadOnly || locked;
-    const targetDate = timeline[m]?.targetDate || '';
-    const actualDate = timeline[m]?.actualDate || (done ? today : '');
+    const done        = !!milestones[m];
+    const locked      = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
+    const disabled    = isReadOnly || locked;
+    const targetStart = timeline[m]?.startDate || '';
+    const targetEnd   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
+    const actualDate  = timeline[m]?.actualDate || (done ? today : '');
     return `
-      <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
+      <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
         <input type="checkbox" class="ms-check" data-index="${i}" data-milestone="${m}"
           ${done ? 'checked' : ''} ${disabled ? 'disabled' : ''}
           style="width:15px;height:15px;accent-color:var(--primary);cursor:${disabled ? 'not-allowed' : 'pointer'}" />
@@ -8067,7 +8140,8 @@ function openMilestonesModal(projectId) {
           <span style="font-size:.72rem;color:var(--txt-muted);font-weight:600;margin-right:.3rem">${i + 1}.</span>
           <span class="ms-label" style="font-size:.85rem;${done ? 'text-decoration:line-through;color:var(--txt-muted)' : 'font-weight:500'}">${m}</span>
         </div>
-        <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetDate || '—'}</div>
+        <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetStart || '—'}</div>
+        <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetEnd || '—'}</div>
         <div style="font-size:.78rem;color:${done ? '#16a34a' : 'var(--txt-muted)'};text-align:center">
           <span class="ms-actual-display">${actualDate || '—'}</span>
           <input type="hidden" class="ms-actual" data-milestone="${m}" value="${actualDate}" />
@@ -8116,8 +8190,8 @@ function openMilestonesModal(projectId) {
           <div class="progress-bar" id="ms-progress-bar" style="width:${progress}%"></div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
-        <div></div><div>Milestone</div><div style="text-align:center">Target</div><div style="text-align:center">Actual</div><div></div>
+      <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
+        <div></div><div>Milestone</div><div style="text-align:center">Target Start</div><div style="text-align:center">Target End</div><div style="text-align:center">Actual</div><div></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.35rem" id="ms-list">${progressRows}</div>
       <div class="modal-actions" style="margin-top:1.2rem">
@@ -8231,6 +8305,7 @@ function openMilestonesModal(projectId) {
   // ── Save helpers ───────────────────────────────────────────────
   function savePlanningDates() {
     const updatedTimeline = collectTimeline();
+    syncTemplateToMilestones(updatedTimeline, getMsActivePhases());
     const list = getProjects();
     const idx  = list.findIndex(x => x.id === projectId);
     list[idx].timeline         = updatedTimeline;
@@ -8249,6 +8324,8 @@ function openMilestonesModal(projectId) {
       updatedMilestones[m] = done;
       const actualInput    = modal.querySelector(`.ms-actual[data-milestone="${m}"]`);
       updatedTimeline[m]   = {
+        startDate:  timeline[m]?.startDate  || '',
+        endDate:    timeline[m]?.endDate    || '',
         targetDate: timeline[m]?.targetDate || '',
         actualDate: done ? (actualInput?.value || timeline[m]?.actualDate || today) : '',
       };
@@ -8785,19 +8862,24 @@ function downloadTimeline(p, milestones, timeline, phases) {
       <td style="background:${phaseBg};color:#fff;padding:7px;border:1px solid #0f4b05"></td>
     </tr>`;
 
-    phase.tasks.forEach(task => {
+    const isCustomPhase = !phase.milestone;
+    phase.tasks.forEach((task, ti) => {
       const indent   = (task.indent || 0);
       const pl       = 10 + indent * 18;
       const isHeader = !task.duration && !task.assignedTo;
       const taskSt   = (isHeader || (!task.assignedTo && !task.duration)) ? '' : statusText;
       const taskStBg = taskSt ? statusBg : rowBg;
       const taskStFg = taskSt ? statusFg : '#607060';
+      // Use per-task dates for custom templates, phase dates for built-in
+      const taskData   = isCustomPhase ? (timeline[key + '_t' + ti] || {}) : {};
+      const taskStart  = fmtXlDate(taskData.startDate || msData.startDate || '');
+      const taskEnd    = fmtXlDate(taskData.endDate || taskData.targetDate || msData.endDate || msData.targetDate || '');
       rows += `<tr>
         <td style="background:${rowBg};padding:5px 6px 5px ${pl}px;border:1px solid #e4ece4;font-weight:${isHeader?'600':'400'};color:#092903">${task.label}</td>
         <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#607060">${task.duration !== '' && task.duration != null ? task.duration : ''}</td>
         <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#607060">${task.assignedTo || ''}</td>
-        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#5a7a5a">${task.assignedTo ? startDate : ''}</td>
-        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#5a7a5a">${task.assignedTo ? endDate : ''}</td>
+        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#5a7a5a">${task.assignedTo ? taskStart : ''}</td>
+        <td style="background:${rowBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;color:#5a7a5a">${task.assignedTo ? taskEnd : ''}</td>
         <td style="background:${taskStBg};text-align:center;padding:5px 6px;border:1px solid #e4ece4;font-weight:700;color:${taskStFg};font-size:8.5pt">${taskSt}</td>
         <td style="background:${rowBg};padding:5px 6px;border:1px solid #e4ece4"></td>
       </tr>`;

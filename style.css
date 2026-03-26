@@ -654,6 +654,7 @@ tbody td { padding: .55rem .8rem; vertical-align: middle; }
 .btn-ghost:hover   { background: var(--bg-soft); color: var(--txt); }
 .btn-sm            { padding: .3rem .7rem; font-size: .8rem; }
 .btn-full          { width: 100%; justify-content: center; }
+.btn:disabled      { opacity: .4; cursor: not-allowed; pointer-events: none; }
 
 /* ── MODAL ──────────────────────────────────────────────────── */
 .modal-backdrop {
