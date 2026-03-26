@@ -191,6 +191,7 @@ const PROJECTS_FILE     = path.join(__dirname, 'pmt-projects.json');
 const TOOLS_FILE        = path.join(__dirname, 'pmt-tools.json');
 const INTEGRATIONS_FILE = path.join(__dirname, 'pmt-integrations.json');
 const HUBS_FILE         = path.join(__dirname, 'pmt-resource-hubs.json');
+const TEMPLATES_FILE    = path.join(__dirname, 'pmt-timeline-templates.json');
 
 const DEFAULT_INTEGRATIONS = {
   connectors: [
@@ -296,4 +297,13 @@ if (!fs.existsSync(ROLES_FILE)) {
   console.log('  Roles seeded with defaults.');
 }
 
-module.exports = { getUsers, saveUsers, getPermissions, savePermissions, getRoles, saveRoles, getAuditLog, appendAuditEntry, clearAuditLog, getSettings, saveSettings, getAnnouncements, saveAnnouncements, getIntegrations, saveIntegrations, getProjects, saveProjects, getAllUserTools, saveAllUserTools, getHubs, saveHubs };
+function getTimelineTemplates() {
+  if (!fs.existsSync(TEMPLATES_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8')); }
+  catch { return []; }
+}
+function saveTimelineTemplates(data) {
+  fs.writeFileSync(TEMPLATES_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
+module.exports = { getUsers, saveUsers, getPermissions, savePermissions, getRoles, saveRoles, getAuditLog, appendAuditEntry, clearAuditLog, getSettings, saveSettings, getAnnouncements, saveAnnouncements, getIntegrations, saveIntegrations, getProjects, saveProjects, getAllUserTools, saveAllUserTools, getHubs, saveHubs, getTimelineTemplates, saveTimelineTemplates };

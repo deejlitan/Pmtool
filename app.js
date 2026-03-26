@@ -119,20 +119,28 @@ const TIMELINE_PHASES = [
 ];
 
 // ── Build Timeline Planning rows (modal) ──────────────────────
-// Returns HTML string for the Timeline Planning tab
-function buildPlanningRows(timeline, milestones, isReadOnly) {
+// Returns HTML string for the Timeline Planning tab.
+// Optional `phases` param: if provided, uses custom template phases instead of TIMELINE_PHASES.
+function buildPlanningRows(timeline, milestones, isReadOnly, phases) {
+  const isCustom = !!phases;
+  phases = phases || TIMELINE_PHASES;
   const dateCss = `font-size:.75rem;padding:.22rem .4rem;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.15);color:#fff;width:120px;color-scheme:dark`;
   let html = '';
-  TIMELINE_PHASES.forEach((phase, pi) => {
-    const m         = phase.milestone;
-    const startDate = timeline[m]?.startDate || '';
-    const endDate   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
-    const done      = !!milestones[m];
-    const done2     = !phase.milestone2 || !!milestones[phase.milestone2];
-    const phaseDone = done && done2;
-    const phaseIdx  = MILESTONES.indexOf(m);
-    const prevDone  = phaseIdx <= 0 || MILESTONES.slice(0, phaseIdx).every(ms => milestones[ms]);
-    const isActive  = !phaseDone && prevDone;
+  phases.forEach((phase) => {
+    // Date storage key: milestone name (built-in) or slugified label (custom)
+    const key       = phase.milestone || phase.key || phase.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    const startDate = timeline[key]?.startDate || '';
+    const endDate   = timeline[key]?.endDate || timeline[key]?.targetDate || '';
+    // Status badges only apply when milestone mapping exists
+    let phaseDone = false, isActive = false;
+    if (phase.milestone) {
+      const done  = !!milestones[phase.milestone];
+      const done2 = !phase.milestone2 || !!milestones[phase.milestone2];
+      phaseDone   = done && done2;
+      const phaseIdx = MILESTONES.indexOf(phase.milestone);
+      const prevDone = phaseIdx <= 0 || MILESTONES.slice(0, phaseIdx).every(ms => milestones[ms]);
+      isActive = !phaseDone && prevDone;
+    }
     const headerBg  = phaseDone ? '#166534' : isActive ? '#065f46' : '#1a6b08';
     const rowBg     = phaseDone ? '#f0fdf4' : isActive ? '#fffbeb' : '#fafafa';
     const statusBadge = phaseDone
@@ -141,19 +149,19 @@ function buildPlanningRows(timeline, milestones, isReadOnly) {
         ? `<span style="font-size:.65rem;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;font-weight:700;white-space:nowrap">▶ Active</span>`
         : '';
 
-    // Phase header row — label | badge | From date | To date
+    // Phase header row — label | badge | Start date | End date
     html += `<div style="border-radius:8px;overflow:hidden;border:1.5px solid #166534;margin-bottom:.2rem">
       <div style="background:${headerBg};color:#fff;display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.55rem .9rem">
         <span style="font-size:.8rem;font-weight:700;letter-spacing:.3px">${phase.label}</span>
         <span>${statusBadge}</span>
         <div style="display:flex;flex-direction:column;gap:1px;align-items:flex-end">
           <span style="font-size:.58rem;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em">Start</span>
-          <input type="date" class="plan-start" data-milestone="${m}" value="${startDate}"
+          <input type="date" class="plan-start" data-milestone="${key}" value="${startDate}"
             ${isReadOnly ? 'disabled' : ''} style="${dateCss}" />
         </div>
         <div style="display:flex;flex-direction:column;gap:1px;align-items:flex-end">
           <span style="font-size:.58rem;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em">End</span>
-          <input type="date" class="plan-end" data-milestone="${m}" value="${endDate}"
+          <input type="date" class="plan-end" data-milestone="${key}" value="${endDate}"
             ${isReadOnly ? 'disabled' : ''} style="${dateCss}" />
         </div>
       </div>`;
@@ -173,30 +181,238 @@ function buildPlanningRows(timeline, milestones, isReadOnly) {
     html += `</div>`;
   });
 
-  // Any extra milestones not covered by TIMELINE_PHASES (custom ones)
-  const coveredMs = new Set(TIMELINE_PHASES.flatMap(ph => [ph.milestone, ph.milestone2].filter(Boolean)));
-  MILESTONES.forEach((m, i) => {
-    if (coveredMs.has(m)) return;
-    const startDate = timeline[m]?.startDate || '';
-    const endDate   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
-    html += `<div style="display:grid;grid-template-columns:1fr 130px 130px;gap:.5rem;align-items:center;padding:.5rem .9rem;border-radius:8px;border:1.5px solid var(--border);background:var(--bg)">
-      <span style="font-size:.85rem;font-weight:500">${m}</span>
-      <div style="display:flex;flex-direction:column;gap:1px">
-        <span style="font-size:.6rem;color:var(--txt-muted);text-transform:uppercase">Start</span>
-        <input type="date" class="plan-start" data-milestone="${m}" value="${startDate}"
-          ${isReadOnly ? 'disabled' : ''}
-          style="font-size:.8rem;padding:.3rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly?'#f8f8f8':'var(--surface)'};color:var(--txt);width:100%" />
-      </div>
-      <div style="display:flex;flex-direction:column;gap:1px">
-        <span style="font-size:.6rem;color:var(--txt-muted);text-transform:uppercase">End</span>
-        <input type="date" class="plan-end" data-milestone="${m}" value="${endDate}"
-          ${isReadOnly ? 'disabled' : ''}
-          style="font-size:.8rem;padding:.3rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly?'#f8f8f8':'var(--surface)'};color:var(--txt);width:100%" />
-      </div>
-    </div>`;
-  });
+  // Only add uncovered system milestones for the built-in template
+  if (!isCustom) {
+    const coveredMs = new Set(phases.flatMap(ph => [ph.milestone, ph.milestone2].filter(Boolean)));
+    MILESTONES.forEach((m) => {
+      if (coveredMs.has(m)) return;
+      const startDate = timeline[m]?.startDate || '';
+      const endDate   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
+      html += `<div style="display:grid;grid-template-columns:1fr 130px 130px;gap:.5rem;align-items:center;padding:.5rem .9rem;border-radius:8px;border:1.5px solid var(--border);background:var(--bg)">
+        <span style="font-size:.85rem;font-weight:500">${m}</span>
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <span style="font-size:.6rem;color:var(--txt-muted);text-transform:uppercase">Start</span>
+          <input type="date" class="plan-start" data-milestone="${m}" value="${startDate}"
+            ${isReadOnly ? 'disabled' : ''}
+            style="font-size:.8rem;padding:.3rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly?'#f8f8f8':'var(--surface)'};color:var(--txt);width:100%" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <span style="font-size:.6rem;color:var(--txt-muted);text-transform:uppercase">End</span>
+          <input type="date" class="plan-end" data-milestone="${m}" value="${endDate}"
+            ${isReadOnly ? 'disabled' : ''}
+            style="font-size:.8rem;padding:.3rem .5rem;border:1.5px solid var(--border);border-radius:6px;background:${isReadOnly?'#f8f8f8':'var(--surface)'};color:var(--txt);width:100%" />
+        </div>
+      </div>`;
+    });
+  }
 
   return html;
+}
+
+// ── Parse uploaded Excel file into timeline template phases ───
+function parseTimelineTemplateFile(file, callback) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb     = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const ws     = wb.Sheets[wb.SheetNames[0]];
+      const rows   = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      const phases = [];
+      let current  = null;
+      for (let i = 1; i < rows.length; i++) {  // skip header row
+        const row  = rows[i];
+        const type = String(row[0] || '').trim().toUpperCase();
+        const lbl  = String(row[1] || '').trim();
+        if (!lbl) continue;
+        if (type === 'PHASE') {
+          current = {
+            label: lbl,
+            key:   lbl.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''),
+            tasks: [],
+          };
+          phases.push(current);
+        } else if (current) {
+          current.tasks.push({
+            label:      lbl,
+            indent:     parseInt(row[2]) || 0,
+            duration:   (row[3] !== '' && row[3] != null) ? row[3] : '',
+            assignedTo: String(row[4] || '').trim(),
+          });
+        }
+      }
+      callback(null, phases);
+    } catch (err) {
+      callback(err, []);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Download the blank Excel import format for admins ─────────
+function downloadTimelineTemplateFormat() {
+  const data = [
+    ['ROW_TYPE', 'LABEL', 'INDENT (0/1/2)', 'DURATION (DAYS)', 'ASSIGNED TO'],
+    ['PHASE', 'PHASE 1: KICK OFF MEETING', '', '', ''],
+    ['TASK', 'Introduction', '0', '1', 'SPROUT'],
+    ['TASK', 'Project Timeline', '0', '1', 'SPROUT'],
+    ['TASK', 'HR Policy Questionnaire', '0', '', 'SPROUT AND CLIENT'],
+    ['PHASE', 'PHASE 2: DATA GATHERING', '', '', ''],
+    ['TASK', 'Account Creation', '0', '3', 'SPROUT'],
+    ['TASK', 'Data Submission', '0', '', 'CLIENT'],
+    ['TASK', 'Masterfile', '1', '4', 'CLIENT'],
+    ['TASK', 'Payroll Registers', '1', '', 'CLIENT'],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 12 }, { wch: 45 }, { wch: 16 }, { wch: 16 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Import Format');
+  XLSX.writeFile(wb, 'timeline-template-import-format.xlsx');
+}
+
+// ── Add Timeline Template modal ───────────────────────────────
+function openAddTimelineTemplateModal(onSaved) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" style="max-width:520px;width:96%">
+      <h3 style="margin-bottom:1rem">&#128203; Add Timeline Template</h3>
+
+      <div style="margin-bottom:1rem">
+        <label style="display:block;font-size:.84rem;font-weight:600;margin-bottom:.4rem;color:var(--txt)">Template Name</label>
+        <input type="text" id="atpl-name" placeholder="e.g. Light Package Implementation"
+          style="width:100%;padding:.45rem .75rem;border:1.5px solid var(--border);border-radius:7px;font-size:.9rem;background:var(--bg);color:var(--txt);box-sizing:border-box" />
+      </div>
+
+      <div style="margin-bottom:1rem">
+        <label style="display:block;font-size:.84rem;font-weight:600;margin-bottom:.5rem;color:var(--txt)">Structure Source</label>
+        <div style="display:flex;gap:.5rem">
+          <label id="atpl-src-upload-lbl" style="display:flex;align-items:center;gap:.4rem;cursor:pointer;padding:.45rem .75rem;border:1.5px solid var(--primary);border-radius:7px;flex:1;font-size:.83rem;background:#f0fdf4">
+            <input type="radio" name="atpl-source" value="upload" checked style="accent-color:var(--primary)" />
+            &#128196; Upload Excel File
+          </label>
+          <label id="atpl-src-copy-lbl" style="display:flex;align-items:center;gap:.4rem;cursor:pointer;padding:.45rem .75rem;border:1.5px solid var(--border);border-radius:7px;flex:1;font-size:.83rem">
+            <input type="radio" name="atpl-source" value="copy" style="accent-color:var(--primary)" />
+            &#128260; Copy Built-in Standard
+          </label>
+        </div>
+      </div>
+
+      <div id="atpl-upload-section">
+        <div style="border:2px dashed var(--border);border-radius:8px;padding:1rem;text-align:center;margin-bottom:.6rem;background:var(--surface)">
+          <div style="font-size:.8rem;color:var(--txt-muted);margin-bottom:.5rem">Upload an Excel (.xlsx) file using the import format.</div>
+          <input type="file" id="atpl-file-input" accept=".xlsx,.xls" style="display:none" />
+          <button class="btn btn-ghost btn-sm" id="atpl-file-browse">&#128193; Choose File</button>
+          <span id="atpl-file-name" style="font-size:.82rem;color:var(--txt-muted);margin-left:.5rem">No file selected</span>
+        </div>
+        <div id="atpl-preview" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.75rem;font-size:.82rem;max-height:160px;overflow-y:auto"></div>
+      </div>
+
+      <div id="atpl-copy-section" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.75rem;font-size:.82rem;color:var(--txt-muted)">
+        Creates a copy of the Standard Payroll Implementation template (${TIMELINE_PHASES.length} phases). The structure is copied as-is — rename it to differentiate from the built-in.
+      </div>
+
+      <div id="atpl-error" style="display:none;color:#dc2626;font-size:.82rem;margin-top:.5rem;padding:.4rem .6rem;background:#fef2f2;border-radius:6px"></div>
+
+      <div class="modal-actions" style="margin-top:1.25rem">
+        <button class="btn btn-ghost" id="atpl-cancel">Cancel</button>
+        <button class="btn btn-primary" id="atpl-save" disabled>Save Template</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  let parsedPhases = null;
+
+  function updateSaveBtn() {
+    const hasName   = backdrop.querySelector('#atpl-name').value.trim().length > 0;
+    const hasPhases = !!parsedPhases;
+    backdrop.querySelector('#atpl-save').disabled = !(hasName && hasPhases);
+  }
+
+  // Radio source toggle
+  backdrop.querySelectorAll('input[name="atpl-source"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isUpload = radio.value === 'upload';
+      backdrop.querySelector('#atpl-upload-section').style.display = isUpload ? 'block' : 'none';
+      backdrop.querySelector('#atpl-copy-section').style.display   = isUpload ? 'none'  : 'block';
+      backdrop.querySelector('#atpl-src-upload-lbl').style.borderColor = isUpload ? 'var(--primary)' : 'var(--border)';
+      backdrop.querySelector('#atpl-src-upload-lbl').style.background  = isUpload ? '#f0fdf4' : 'transparent';
+      backdrop.querySelector('#atpl-src-copy-lbl').style.borderColor   = isUpload ? 'var(--border)' : 'var(--primary)';
+      backdrop.querySelector('#atpl-src-copy-lbl').style.background    = isUpload ? 'transparent' : '#f0fdf4';
+      if (!isUpload) {
+        // Copy built-in
+        parsedPhases = TIMELINE_PHASES.map(p => ({
+          label:      p.label,
+          key:        (p.milestone || p.label).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''),
+          milestone:  p.milestone,
+          milestone2: p.milestone2,
+          tasks:      p.tasks.map(t => ({ ...t })),
+        }));
+      } else {
+        parsedPhases = null;
+      }
+      updateSaveBtn();
+    });
+  });
+
+  // File browse
+  backdrop.querySelector('#atpl-file-browse').addEventListener('click', () => backdrop.querySelector('#atpl-file-input').click());
+
+  // File selected → parse
+  backdrop.querySelector('#atpl-file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    backdrop.querySelector('#atpl-file-name').textContent = file.name;
+    parseTimelineTemplateFile(file, (err, phases) => {
+      const preview = backdrop.querySelector('#atpl-preview');
+      preview.style.display = 'block';
+      if (err || !phases.length) {
+        preview.innerHTML = '<span style="color:#dc2626">&#9888; Could not parse file. Make sure it matches the Import Format (ROW_TYPE column = PHASE or TASK).</span>';
+        parsedPhases = null;
+        updateSaveBtn();
+        return;
+      }
+      parsedPhases = phases;
+      const taskCount = phases.reduce((acc, p) => acc + p.tasks.length, 0);
+      preview.innerHTML = `
+        <div style="font-weight:600;color:#059669;margin-bottom:.5rem">&#10003; Parsed successfully: ${phases.length} phases, ${taskCount} tasks</div>
+        ${phases.map(p => `<div style="font-size:.8rem;margin-bottom:.15rem"><span style="font-weight:600;color:var(--txt)">${p.label}</span> <span style="color:var(--txt-muted)">&nbsp;${p.tasks.length} tasks</span></div>`).join('')}
+      `;
+      updateSaveBtn();
+    });
+  });
+
+  // Name input → re-check save btn
+  backdrop.querySelector('#atpl-name').addEventListener('input', updateSaveBtn);
+
+  // Cancel
+  backdrop.querySelector('#atpl-cancel').addEventListener('click', () => backdrop.remove());
+
+  // Save
+  backdrop.querySelector('#atpl-save').addEventListener('click', async () => {
+    const name = backdrop.querySelector('#atpl-name').value.trim();
+    if (!name || !parsedPhases) return;
+    const saveBtn = backdrop.querySelector('#atpl-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/timeline-templates', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, phases: parsedPhases }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchTimelineTemplates();
+      backdrop.remove();
+      onSaved();
+    } catch (err) {
+      const errEl = backdrop.querySelector('#atpl-error');
+      errEl.style.display  = 'block';
+      errEl.textContent    = 'Save failed: ' + err.message;
+      saveBtn.disabled     = false;
+      saveBtn.textContent  = 'Save Template';
+    }
+  });
 }
 
 // ── MULTI-SELECT HELPER (shared) ──────────────────────────────
@@ -768,6 +984,18 @@ async function fetchRoles() {
   }
 }
 
+// ── Timeline Templates (fetched from server, cached) ─────────
+let cachedTemplates = [];
+
+async function fetchTimelineTemplates() {
+  try {
+    const res = await fetch('/api/timeline-templates');
+    if (res.ok) cachedTemplates = await res.json();
+  } catch (e) {
+    console.warn('Could not fetch timeline templates:', e);
+  }
+}
+
 function getRoleLabel(roleId) {
   const r = cachedRoles.find(r => r.id === roleId);
   return r ? r.label : (roleId || '');
@@ -1141,6 +1369,7 @@ async function bootApp(user) {
   currentUser = user;
   await fetchUsers();
   await fetchRoles();
+  await fetchTimelineTemplates();
   await fetchPermissions();
   await fetchAppSettings();
   await fetchProjects();
@@ -4820,8 +5049,19 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
         </div>`;
     }).join('');
 
-    // Timeline tab rows
-    const planningRows = buildPlanningRows(timeline, milestones, isReadOnly);
+    // Timeline tab rows — use active template if set
+    const pfActiveTplId  = p.timelineTemplate || '';
+    const pfActiveTpl    = cachedTemplates.find(t => t.id === pfActiveTplId);
+    const pfActivePhases = pfActiveTpl ? pfActiveTpl.phases : null;
+    const pfTplSelectorHtml = cachedTemplates.length > 0 ? `
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.85rem;padding:.55rem .85rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:.83rem;font-weight:600;color:var(--txt);white-space:nowrap">&#128203; Template:</span>
+        <select id="pf-tpl-selector" style="flex:1;padding:.32rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.83rem;background:var(--bg);color:var(--txt)">
+          <option value="">Standard (Built-in)</option>
+          ${cachedTemplates.map(t => `<option value="${t.id}" ${pfActiveTplId === t.id ? 'selected' : ''}>${escAttr(t.name)}</option>`).join('')}
+        </select>
+      </div>` : '';
+    const planningRows = buildPlanningRows(timeline, milestones, isReadOnly, pfActivePhases);
 
     // Documents tab
     const docsHtml = salesDocs.length > 0
@@ -4889,7 +5129,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       <!-- Timeline Tab -->
       <div id="pf-tab-timeline" style="display:${activeTab === 'timeline' ? 'block' : 'none'}">
         <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates per phase. Save first, then download to share with your client.</p>
-        <div style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
+        ${pfTplSelectorHtml}
+        <div id="pf-planning-rows-wrap" style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
         <div class="modal-actions" style="margin-top:1.2rem">
           <button class="btn btn-ghost pf-close-btn">Close</button>
           <button class="btn btn-ghost" id="pf-tl-download-btn">&#11123; Download Timeline</button>
@@ -5029,9 +5270,27 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       return updated;
     }
 
+    function getPfActivePhases() {
+      const tplId = modal.querySelector('#pf-tpl-selector')?.value || '';
+      if (!tplId) return null;
+      const tpl = cachedTemplates.find(t => t.id === tplId);
+      return tpl ? tpl.phases : null;
+    }
+
+    // Template selector → re-render planning rows
+    modal.querySelector('#pf-tpl-selector')?.addEventListener('change', () => {
+      const phases = getPfActivePhases();
+      const wrap   = modal.querySelector('#pf-planning-rows-wrap');
+      if (wrap) wrap.innerHTML = buildPlanningRows(timeline, milestones, isReadOnly, phases);
+      const tplId = modal.querySelector('#pf-tpl-selector').value || null;
+      const list  = getProjects();
+      const idx   = list.findIndex(x => x.id === projectId);
+      if (idx !== -1) { list[idx].timelineTemplate = tplId; saveProjects(list); }
+    });
+
     function handleDownload() {
       const latest = getProjects().find(x => x.id === projectId);
-      downloadTimeline(latest, latest.milestones || {}, collectTimeline());
+      downloadTimeline(latest, latest.milestones || {}, collectTimeline(), getPfActivePhases());
     }
 
     modal.querySelector('#pf-download-btn')?.addEventListener('click', handleDownload);
@@ -5069,7 +5328,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
         const updatedTimeline = collectTimeline();
         const list = getProjects();
         const idx  = list.findIndex(x => x.id === projectId);
-        list[idx].timeline = updatedTimeline;
+        list[idx].timeline         = updatedTimeline;
+        list[idx].timelineTemplate = modal.querySelector('#pf-tpl-selector')?.value || null;
         saveProjects(list);
         alert('Target dates saved!');
       });
@@ -6839,6 +7099,52 @@ async function renderAppSettings(container) {
       </div>
     </div>
 
+    <div class="settings-section settings-section--timeline-tpl" style="margin-top:1.2rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+        <div>
+          <div class="settings-section-title">&#128203; Timeline Templates</div>
+          <div class="settings-section-desc">Build named timeline structures for different project types. Project Managers select a template in the Timeline Planning tab — the phases and tasks appear exactly as defined here. Upload an Excel file to copy its structure.</div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-shrink:0;margin-left:1rem">
+          <button class="btn btn-ghost btn-sm" id="tpl-dl-format-btn">&#11123; Import Format</button>
+          <button class="btn btn-primary btn-sm" id="tpl-add-btn">&#43; Add Template</button>
+        </div>
+      </div>
+
+      <!-- Built-in Standard (always shown, read-only) -->
+      <div class="settings-row" style="align-items:center;margin-top:.85rem">
+        <div class="settings-row-info">
+          <div class="settings-row-label" style="display:flex;align-items:center;gap:.5rem">
+            Standard Payroll Implementation
+            <span style="background:#d1fae5;color:#065f46;font-size:.7rem;padding:.15rem .5rem;border-radius:10px;font-weight:600">Built-in</span>
+          </div>
+          <div class="settings-row-sub">${TIMELINE_PHASES.length} phases &middot; ${TIMELINE_PHASES.reduce((a,p) => a + p.tasks.length, 0)} tasks &middot; Default when no template is selected</div>
+        </div>
+        <span style="font-size:.78rem;color:var(--txt-muted);flex-shrink:0">Cannot be modified</span>
+      </div>
+
+      <!-- Custom templates -->
+      <div id="tpl-settings-list">
+        ${cachedTemplates.length === 0
+          ? `<div style="text-align:center;padding:1rem;color:var(--txt-muted);font-size:.85rem">No custom templates yet. Click <strong>+ Add Template</strong> to create one.</div>`
+          : cachedTemplates.map(t => {
+              const taskCount = (t.phases || []).reduce((a, p) => a + (p.tasks || []).length, 0);
+              return `
+                <div class="settings-row" style="align-items:center">
+                  <div class="settings-row-info">
+                    <div class="settings-row-label">${escAttr(t.name)}</div>
+                    <div class="settings-row-sub">${(t.phases||[]).length} phases &middot; ${taskCount} tasks</div>
+                  </div>
+                  <div style="display:flex;gap:.4rem;flex-shrink:0">
+                    <button class="btn btn-ghost btn-sm tpl-rename-btn" data-id="${t.id}">&#9998; Rename</button>
+                    <button class="btn btn-danger btn-sm tpl-delete-btn" data-id="${t.id}">&#128465;</button>
+                  </div>
+                </div>`;
+            }).join('')
+        }
+      </div>
+    </div>
+
     <div class="settings-section settings-section--integrations">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
         <div>
@@ -6992,6 +7298,39 @@ async function renderAppSettings(container) {
     if (!confirm('This will reset the onboarding tour for ALL users so they see it again. Continue?')) return;
     const res = await fetch('/api/users/onboarding-reset', { method: 'POST' });
     if (res.ok) alert('Done! All users will see the onboarding tour again.');
+  });
+
+  // ── Timeline Templates handlers ───────────────────────────────
+  document.getElementById('tpl-dl-format-btn').addEventListener('click', downloadTimelineTemplateFormat);
+
+  document.getElementById('tpl-add-btn').addEventListener('click', () => {
+    openAddTimelineTemplateModal(() => renderAppSettings(container));
+  });
+
+  container.querySelectorAll('.tpl-rename-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tpl     = cachedTemplates.find(t => t.id === btn.dataset.id);
+      if (!tpl) return;
+      const newName = prompt('Rename template:', tpl.name);
+      if (!newName || newName.trim() === tpl.name) return;
+      await fetch(`/api/timeline-templates/${btn.dataset.id}`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name: newName.trim() }),
+      });
+      await fetchTimelineTemplates();
+      renderAppSettings(container);
+    });
+  });
+
+  container.querySelectorAll('.tpl-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tpl = cachedTemplates.find(t => t.id === btn.dataset.id);
+      if (!confirm(`Delete template "${tpl?.name}"? This cannot be undone.`)) return;
+      await fetch(`/api/timeline-templates/${btn.dataset.id}`, { method: 'DELETE' });
+      await fetchTimelineTemplates();
+      renderAppSettings(container);
+    });
   });
 
   // Add integration
@@ -7694,8 +8033,23 @@ function openMilestonesModal(projectId) {
   const isReadOnly     = !can('edit_milestones');
   const today          = new Date().toISOString().split('T')[0];
 
+  // ── Active template ───────────────────────────────────────────
+  const activeTplId  = p.timelineTemplate || '';
+  const activeTpl    = cachedTemplates.find(t => t.id === activeTplId);
+  const activePhases = activeTpl ? activeTpl.phases : null;
+
+  // Template selector HTML (only if custom templates exist)
+  const tplSelectorHtml = cachedTemplates.length > 0 ? `
+    <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.85rem;padding:.55rem .85rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+      <span style="font-size:.83rem;font-weight:600;color:var(--txt);white-space:nowrap">&#128203; Template:</span>
+      <select id="ms-tpl-selector" style="flex:1;padding:.32rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.83rem;background:var(--bg);color:var(--txt)">
+        <option value="">Standard (Built-in)</option>
+        ${cachedTemplates.map(t => `<option value="${t.id}" ${activeTplId === t.id ? 'selected' : ''}>${escAttr(t.name)}</option>`).join('')}
+      </select>
+    </div>` : '';
+
   // ── Tab 1: Timeline Planning rows ─────────────────────────────
-  const planningRows = buildPlanningRows(timeline, milestones, isReadOnly);
+  const planningRows = buildPlanningRows(timeline, milestones, isReadOnly, activePhases);
 
   // ── Tab 2: Progress Tracking rows ─────────────────────────────
   const progressRows = MILESTONES.map((m, i) => {
@@ -7742,7 +8096,8 @@ function openMilestonesModal(projectId) {
     <!-- Tab 1: Planning -->
     <div id="tab-plan">
       <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates per phase. Save first, then download to present to your client.</p>
-      <div style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
+      ${tplSelectorHtml}
+      <div id="ms-planning-rows-wrap" style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
       <div class="modal-actions" style="margin-top:1.2rem">
         <button class="btn btn-ghost" id="modal-cancel">Close</button>
         <button class="btn btn-ghost" id="plan-download-btn">&#11123; Download Timeline</button>
@@ -7853,12 +8208,33 @@ function openMilestonesModal(projectId) {
     return updated;
   }
 
+  // ── Active phases helper (reads template selector) ────────────
+  function getMsActivePhases() {
+    const tplId = modal.querySelector('#ms-tpl-selector')?.value || '';
+    if (!tplId) return null;
+    const tpl = cachedTemplates.find(t => t.id === tplId);
+    return tpl ? tpl.phases : null;
+  }
+
+  // Template selector → re-render planning rows
+  modal.querySelector('#ms-tpl-selector')?.addEventListener('change', () => {
+    const phases = getMsActivePhases();
+    const wrap   = modal.querySelector('#ms-planning-rows-wrap');
+    if (wrap) wrap.innerHTML = buildPlanningRows(timeline, milestones, isReadOnly, phases);
+    // Persist selection immediately
+    const tplId = modal.querySelector('#ms-tpl-selector').value || null;
+    const list  = getProjects();
+    const idx   = list.findIndex(x => x.id === projectId);
+    if (idx !== -1) { list[idx].timelineTemplate = tplId; saveProjects(list); }
+  });
+
   // ── Save helpers ───────────────────────────────────────────────
   function savePlanningDates() {
     const updatedTimeline = collectTimeline();
     const list = getProjects();
     const idx  = list.findIndex(x => x.id === projectId);
-    list[idx].timeline = updatedTimeline;
+    list[idx].timeline         = updatedTimeline;
+    list[idx].timelineTemplate = modal.querySelector('#ms-tpl-selector')?.value || null;
     saveProjects(list);
     alert('Target dates saved!');
   }
@@ -7892,10 +8268,9 @@ function openMilestonesModal(projectId) {
 
   // ── Download (both tabs use latest data) ──────────────────────
   function handleDownload() {
-    const latestProject = getProjects().find(x => x.id === projectId);
-    // Merge any unsaved planning dates before downloading
+    const latestProject  = getProjects().find(x => x.id === projectId);
     const mergedTimeline = collectTimeline();
-    downloadTimeline(latestProject, latestProject.milestones || {}, mergedTimeline);
+    downloadTimeline(latestProject, latestProject.milestones || {}, mergedTimeline, getMsActivePhases());
   }
 
   // ── Wire up buttons ────────────────────────────────────────────
@@ -8352,15 +8727,27 @@ function openProjectChatModal(projectId) {
 }
 
 // ── DOWNLOAD TIMELINE (Excel) ──────────────────────────────────
-function downloadTimeline(p, milestones, timeline) {
+// Optional `phases` param: custom template phases. Defaults to TIMELINE_PHASES.
+function downloadTimeline(p, milestones, timeline, phases) {
   milestones = milestones || p.milestones || {};
   timeline   = timeline   || p.timeline   || {};
+  phases     = phases     || TIMELINE_PHASES;
 
   const pmName = projectManagerDisplay(p.projectManager);
   const today  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  // Helper: get phase status based on milestone completion
+  // Helper: get phase status based on milestone completion (or date-based for custom phases)
   function phaseStatus(phase) {
+    if (!phase.milestone) {
+      const key       = phase.key || phase.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+      const msData    = timeline[key] || {};
+      const endDate   = msData.endDate || msData.targetDate || '';
+      const startDate = msData.startDate || '';
+      const todayIso  = new Date().toISOString().split('T')[0];
+      if (endDate && endDate < todayIso)   return 'done';
+      if (startDate && startDate <= todayIso) return 'active';
+      return 'pending';
+    }
     const done  = !!milestones[phase.milestone];
     const done2 = !phase.milestone2 || !!milestones[phase.milestone2];
     if (done && done2) return 'done';
@@ -8380,9 +8767,10 @@ function downloadTimeline(p, milestones, timeline) {
   const C = 7; // column count
   let rows = '';
 
-  TIMELINE_PHASES.forEach(phase => {
+  phases.forEach(phase => {
+    const key       = phase.milestone || phase.key || phase.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
     const st        = phaseStatus(phase);
-    const msData    = timeline[phase.milestone] || {};
+    const msData    = timeline[key] || {};
     const startDate = fmtXlDate(msData.startDate || '');
     const endDate   = fmtXlDate(msData.endDate || msData.targetDate || '');
     const phaseBg    = '#1a6b08';

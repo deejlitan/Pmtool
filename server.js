@@ -35,7 +35,8 @@ app.use('/api/integrations',   require('./routes/integrations'));
 app.use('/api/projects',       require('./routes/projects'));
 app.use('/api/tools',          require('./routes/tools'));
 app.use('/api/resource-hub',        require('./routes/resourcehub'));
-app.use('/api/dashboard-overrides', require('./routes/dashboard-overrides'));
+app.use('/api/dashboard-overrides',  require('./routes/dashboard-overrides'));
+app.use('/api/timeline-templates',   require('./routes/timelinetemplates'));
 
 // Public resource hub pages (email-gated, no PMT login required)
 app.use('/hub',                require('./routes/hubpublic'));
