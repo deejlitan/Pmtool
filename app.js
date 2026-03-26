@@ -1076,10 +1076,10 @@ function roleBadge(roleId) {
 }
 
 let permissionsMatrix = {
-  super_admin:     { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:true, view_hubspot:true, manage_users:true, create_delete_projects:true, edit_projects:true, edit_milestones:true, act_as_user:true, log_time:true, view_audit_trail:true, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:false },
-  lead:            { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:true, manage_users:false, create_delete_projects:true, edit_projects:true, edit_milestones:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:false, edit_dashboard_fields:true, view_pm_dashboard_table:false },
-  project_manager: { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:true, edit_milestones:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:true },
-  implementer:     { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:false, edit_milestones:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:false, view_resource_hub:false, generate_resource_hub:false, edit_dashboard_fields:false, view_pm_dashboard_table:false },
+  super_admin:     { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:true, view_hubspot:true, manage_users:true, create_delete_projects:true, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:true, log_time:true, view_audit_trail:true, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false },
+  lead:            { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:true, manage_users:false, create_delete_projects:true, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:false, edit_dashboard_fields:true, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false },
+  project_manager: { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:true, manage_recordings:false, manage_files:false },
+  implementer:     { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:false, edit_milestones:true, edit_actual_dates:false, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:false, view_resource_hub:false, generate_resource_hub:false, edit_dashboard_fields:false, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false },
 };
 
 async function fetchPermissions() {
@@ -4262,17 +4262,24 @@ function kanbanCard(p) {
         ${dueLbl ? `<span class="kanban-card-due${isOverdue ? ' overdue' : ''}">${dueLbl}</span>` : ''}
       </div>
       <div class="kanban-card-actions">
-        ${isRunning
-          ? `<button class="btn btn-danger btn-sm stop-timer-btn" data-id="${p.id}">&#9209; Stop <span id="timer-elapsed-${p.id}" class="timer-elapsed">${formatElapsed(timer.startTime)}</span></button>`
-          : `<button class="btn btn-ghost btn-sm start-timer-btn" data-id="${p.id}">&#9654; Timer</button>`
-        }
-        <button class="btn btn-ghost btn-sm log-hours-btn" data-id="${p.id}">&#128336; Log</button>
-        <button class="btn btn-primary btn-sm open-milestones-btn" data-id="${p.id}">&#9873; Milestones</button>
-        <button class="btn btn-ghost btn-sm open-docs-btn" data-id="${p.id}" title="Milestone notes">&#128196; Docs${docCount ? ` <span class="docs-count">${docCount}</span>` : ''}</button>
-        ${can('view_project_details') ? `<button class="btn btn-ghost btn-sm open-project-details-btn" data-id="${p.id}">&#128203; Details</button>` : ''}
-        ${can('view_resource_hub') ? `<button class="btn btn-ghost btn-sm resource-hub-btn" data-id="${p.id}" title="Resource Hub">&#127760; Hub</button>` : ''}
-        <button class="sidekick-btn ai-chat-btn" data-id="${p.id}" title="Sidekick AI"><img src="/Sidekick.png" alt="Sidekick"> Sidekick</button>
-        <button class="btn btn-ghost btn-sm survey-form-btn" data-id="${p.id}" title="Generate Project Survey Form">&#128221; Survey Form</button>
+        <button class="btn btn-primary btn-sm open-milestones-btn" data-id="${p.id}" style="flex:1">&#9873; Milestones</button>
+        <div class="kcard-more-wrap">
+          <button class="btn btn-ghost btn-sm kcard-more-btn" data-id="${p.id}" title="More actions">&#8943;</button>
+          <div class="kcard-dropdown" data-id="${p.id}">
+            ${isRunning
+              ? `<button class="kcard-drop-item item-danger stop-timer-btn" data-id="${p.id}">&#9209; Stop Timer &nbsp;<span id="timer-elapsed-${p.id}" class="timer-elapsed">${formatElapsed(timer.startTime)}</span></button>`
+              : `<button class="kcard-drop-item start-timer-btn" data-id="${p.id}">&#9654; Timer</button>`
+            }
+            <button class="kcard-drop-item log-hours-btn" data-id="${p.id}">&#128336; Log Hours</button>
+            <button class="kcard-drop-item open-docs-btn" data-id="${p.id}">&#128196; Documentation${docCount ? ` <span class="docs-count">${docCount}</span>` : ''}</button>
+            ${can('view_project_details') ? `<button class="kcard-drop-item open-contacts-btn" data-id="${p.id}">&#128101; Contacts</button>` : ''}
+            ${can('manage_recordings') ? `<button class="kcard-drop-item open-recordings-btn" data-id="${p.id}">&#127909; Recordings</button>` : ''}
+            ${can('manage_files') ? `<button class="kcard-drop-item open-files-btn" data-id="${p.id}">&#128193; Files</button>` : ''}
+            ${can('view_resource_hub') ? `<button class="kcard-drop-item resource-hub-btn" data-id="${p.id}">&#127760; Hub</button>` : ''}
+            <button class="kcard-drop-item ai-chat-btn" data-id="${p.id}"><img src="/Sidekick.png" alt="Sidekick"> Sidekick</button>
+            <button class="kcard-drop-item survey-form-btn" data-id="${p.id}">&#128221; Survey Form</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -4290,6 +4297,36 @@ function attachKanbanHandlers(container) {
     card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
     });
+  });
+
+  // ── ⋯ dropdown toggle ─────────────────────────────────────────
+  container.querySelectorAll('.kcard-more-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const dropdown = btn.closest('.kcard-more-wrap').querySelector('.kcard-dropdown');
+      const isOpen   = dropdown.classList.contains('open');
+      // Close all open dropdowns first
+      document.querySelectorAll('.kcard-dropdown.open').forEach(d => d.classList.remove('open'));
+      if (!isOpen) {
+        // Show first so we can measure its height
+        dropdown.classList.add('open');
+        const btnRect = btn.getBoundingClientRect();
+        const ddRect  = dropdown.getBoundingClientRect();
+        // Open above if there's room, otherwise below
+        const top = btnRect.top - ddRect.height - 4 > 0
+          ? btnRect.top - ddRect.height - 4
+          : btnRect.bottom + 4;
+        dropdown.style.top  = top + 'px';
+        dropdown.style.left = btnRect.left + 'px';
+      }
+    });
+  });
+  // Close dropdown when clicking anywhere outside
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.kcard-dropdown.open').forEach(d => d.classList.remove('open'));
+  });
+  container.querySelectorAll('.kcard-dropdown').forEach(dd => {
+    dd.addEventListener('click', e => e.stopPropagation());
   });
 
   container.querySelectorAll('.toggle-type-btn').forEach(btn => {
@@ -4311,10 +4348,24 @@ function attachKanbanHandlers(container) {
     });
   });
 
-  container.querySelectorAll('.open-project-details-btn').forEach(btn => {
+  container.querySelectorAll('.open-contacts-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      openProjectDetailsModal(btn.dataset.id);
+      openContactsModal(btn.dataset.id);
+    });
+  });
+
+  container.querySelectorAll('.open-recordings-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openRecordingsModal(btn.dataset.id);
+    });
+  });
+
+  container.querySelectorAll('.open-files-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openFilesModal(btn.dataset.id);
     });
   });
 
@@ -4861,25 +4912,40 @@ function openDocsModal(projectId) {
     const entries = proj?.docs?.[milestone] || [];
 
     const entriesHtml = entries.length === 0
-      ? `<div style="text-align:center;padding:1.2rem 0;color:var(--txt-muted);font-size:.85rem">No notes yet for this milestone.</div>`
+      ? `<div style="text-align:center;padding:1.5rem 0;color:var(--txt-muted);font-size:.85rem">No notes yet for this milestone.</div>`
       : [...entries].reverse().map(d => `
-          <div style="border:1px solid var(--border);border-radius:6px;padding:.55rem .7rem;margin-bottom:.45rem">
-            <div style="font-size:.72rem;color:var(--txt-muted);margin-bottom:.25rem">
-              ${new Date(d.createdAt).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}
-              &middot; ${d.createdByName}
+          <div style="border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;margin-bottom:.5rem;background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+              <span style="font-size:.7rem;color:var(--txt-muted)">
+                ${new Date(d.createdAt).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+              </span>
+              <span style="font-size:.7rem;font-weight:600;color:var(--primary)">&#183; ${d.createdByName}</span>
             </div>
-            <div style="font-size:.84rem;color:var(--txt);white-space:pre-wrap;line-height:1.45">${d.text}</div>
+            <div style="font-size:.84rem;color:var(--txt);line-height:1.55">${d.html || d.text?.replace(/\n/g,'<br>') || ''}</div>
           </div>`).join('');
+
+    const toolbarBtn = (cmd, icon, title) =>
+      `<button type="button" class="doc-fmt-btn" data-cmd="${cmd}" title="${title}"
+        style="padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--txt);cursor:pointer;font-size:.8rem;line-height:1;font-family:inherit">${icon}</button>`;
 
     const modal = createModal(`
       <h3>&#128196; Documentation</h3>
       <div style="font-size:.78rem;color:var(--txt-muted);margin-bottom:.85rem;font-weight:500">
         &#9873; ${milestone} &nbsp;&mdash;&nbsp; ${proj.title}
       </div>
-      <div style="max-height:220px;overflow-y:auto;margin-bottom:.85rem">${entriesHtml}</div>
-      <div class="form-group" style="margin-bottom:.5rem">
-        <label>Add a Note</label>
-        <textarea id="docs-input" rows="3" placeholder="What happened at this milestone?..." style="resize:vertical"></textarea>
+      <div style="max-height:240px;overflow-y:auto;margin-bottom:1rem;padding-right:.2rem">${entriesHtml}</div>
+      <div style="margin-bottom:.4rem">
+        <div style="font-size:.75rem;font-weight:600;color:var(--txt-muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Add a Note</div>
+        <div style="display:flex;gap:.3rem;margin-bottom:.35rem;flex-wrap:wrap">
+          ${toolbarBtn('bold',      '<b>B</b>',  'Bold')}
+          ${toolbarBtn('italic',    '<i>I</i>',  'Italic')}
+          ${toolbarBtn('underline', '<u>U</u>',  'Underline')}
+          ${toolbarBtn('insertUnorderedList', '&#8226; List', 'Bullet List')}
+          ${toolbarBtn('insertOrderedList',   '1. List',      'Numbered List')}
+        </div>
+        <div id="docs-editor" contenteditable="true"
+          style="min-height:90px;max-height:180px;overflow-y:auto;border:1.5px solid var(--border);border-radius:6px;padding:.55rem .75rem;font-size:.84rem;line-height:1.55;background:var(--bg);color:var(--txt);outline:none;font-family:inherit"
+          data-placeholder="What happened at this milestone?..."></div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="docs-cancel">Close</button>
@@ -4887,20 +4953,34 @@ function openDocsModal(projectId) {
       </div>
     `);
 
-    document.getElementById('docs-cancel').addEventListener('click', () => modal.remove());
-    document.getElementById('docs-add').addEventListener('click', () => {
-      const text = document.getElementById('docs-input').value.trim();
-      if (!text) return;
+    // Placeholder behaviour
+    const editor = modal.querySelector('#docs-editor');
+    editor.addEventListener('focus', () => { if (!editor.textContent.trim()) editor.innerHTML = ''; });
+
+    // Format toolbar
+    modal.querySelectorAll('.doc-fmt-btn').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault(); // keep focus in editor
+        editor.focus();
+        document.execCommand(btn.dataset.cmd, false, null);
+      });
+    });
+
+    modal.querySelector('#docs-cancel').addEventListener('click', () => modal.remove());
+    modal.querySelector('#docs-add').addEventListener('click', () => {
+      const html = editor.innerHTML.trim();
+      if (!html || html === '<br>') return;
       const list = getProjects();
       const idx  = list.findIndex(x => x.id === projectId);
       if (idx === -1) return;
       if (!list[idx].docs) list[idx].docs = {};
       if (!list[idx].docs[milestone]) list[idx].docs[milestone] = [];
       list[idx].docs[milestone].push({
-        id:              genId(),
-        text,
-        createdAt:       new Date().toISOString(),
-        createdByName:   effectiveUser()?.name || 'Unknown',
+        id:            genId(),
+        html,
+        text:          editor.innerText,
+        createdAt:     new Date().toISOString(),
+        createdByName: effectiveUser()?.name || 'Unknown',
       });
       saveProjects(list);
       modal.remove();
@@ -4911,84 +4991,58 @@ function openDocsModal(projectId) {
   buildModal();
 }
 
-// ── PROJECT DETAILS MODAL (Sales Docs + Contacts) ─────────────
-function openProjectDetailsModal(projectId) {
+// ── CONTACTS MODAL ────────────────────────────────────────────
+function openContactsModal(projectId) {
   function buildModal() {
     const p = getProjects().find(x => x.id === projectId);
     if (!p) return;
-    const details  = p.details  || {};
-    const contacts = details.contacts || [];
-    // Migrate legacy single-link to array format
-    const salesDocs = details.salesDocs || (details.salesDriveLink ? [{ id: genId(), name: 'Project Link', url: details.salesDriveLink }] : []);
+    const contacts = p.details?.contacts || [];
 
     const contactRows = contacts.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;padding:.75rem;color:var(--txt-muted);font-size:.83rem">No contacts added yet.</td></tr>`
+      ? `<tr><td colspan="7" style="text-align:center;padding:.75rem;color:var(--txt-muted);font-size:.83rem">No contacts added yet.</td></tr>`
       : contacts.map((c, i) => `
           <tr>
-            <td>${c.name}</td>
-            <td>${c.phone || '—'}</td>
-            <td>${c.email || '—'}</td>
-            <td>${c.position || '—'}</td>
-            <td>${c.projectRole || '—'}</td>
-            <td><span class="badge" style="background:${c.access === 'full' ? '#d1fae5' : '#fef3c7'};color:${c.access === 'full' ? '#065f46' : '#92400e'}">${c.access === 'full' ? 'Full' : 'Limited'}</span></td>
-            <td><button class="btn btn-danger btn-sm remove-contact-btn" data-idx="${i}" style="padding:.15rem .4rem;font-size:.72rem">&#10005;</button></td>
+            <td style="padding:.4rem .6rem;font-size:.8rem">${c.name}</td>
+            <td style="padding:.4rem .6rem;font-size:.8rem">${c.phone || '—'}</td>
+            <td style="padding:.4rem .6rem;font-size:.8rem">${c.email || '—'}</td>
+            <td style="padding:.4rem .6rem;font-size:.8rem">${c.position || '—'}</td>
+            <td style="padding:.4rem .6rem;font-size:.8rem">${c.projectRole || '—'}</td>
+            <td style="padding:.4rem .6rem;font-size:.8rem"><span class="badge" style="background:${c.access === 'full' ? '#d1fae5' : '#fef3c7'};color:${c.access === 'full' ? '#065f46' : '#92400e'}">${c.access === 'full' ? 'Full' : 'Limited'}</span></td>
+            <td style="padding:.4rem .6rem"><button class="btn btn-danger btn-sm remove-contact-btn" data-idx="${i}" style="padding:.15rem .4rem;font-size:.72rem">&#10005;</button></td>
           </tr>`).join('');
 
     const modal = createModal(`
-      <h3>&#128203; Project Details &mdash; <span style="font-weight:400;font-size:.95rem">${p.title}</span></h3>
+      <h3>&#128101; Contacts &mdash; <span style="font-weight:400;font-size:.95rem">${p.title}</span></h3>
 
-      <div style="margin-top:.75rem">
-        <div style="font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-muted);margin-bottom:.6rem">&#128279; Project Links</div>
-        ${salesDocs.length > 0 ? `
-        <div id="pd-docs-list" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.75rem">
-          ${salesDocs.map((d, i) => `
-            <div style="display:flex;align-items:center;gap:.6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.45rem .75rem">
-              <span style="font-size:.82rem;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.url}">&#128193; ${d.name}</span>
-              <a href="${d.url}" target="_blank" style="font-size:.78rem;color:var(--primary);text-decoration:none;white-space:nowrap;font-weight:600">Open ↗</a>
-              <button class="btn btn-danger btn-sm remove-doc-btn" data-idx="${i}" style="padding:.1rem .35rem;font-size:.7rem;line-height:1">&#10005;</button>
-            </div>`).join('')}
-        </div>` : `<p style="font-size:.82rem;color:var(--txt-muted);margin:0 0 .75rem">No links added yet.</p>`}
-        <div style="display:flex;gap:.5rem;align-items:center">
-          <input type="text" id="pd-doc-name" placeholder="Label (e.g. Proposal, SOW…)"
-            style="flex:0 0 180px;padding:.38rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <input type="url" id="pd-doc-url" placeholder="Paste link (Drive, Notion, SharePoint…)"
-            style="flex:1;padding:.38rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <button id="pd-add-doc" title="Add link" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:2px solid var(--primary);background:var(--primary);color:#fff;font-size:1.1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
-        </div>
+      <div style="overflow-x:auto;margin:.75rem 0">
+        <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+          <thead>
+            <tr style="background:var(--surface);text-align:left">
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Name</th>
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Phone</th>
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Email</th>
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Position</th>
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Project Role</th>
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Access</th>
+              <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)"></th>
+            </tr>
+          </thead>
+          <tbody id="pd-contacts-body">${contactRows}</tbody>
+        </table>
       </div>
 
-      <div class="settings-section" style="margin-top:1rem">
-        <div style="font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-muted);margin-bottom:.6rem">&#128101; Project Contacts</div>
-        <div style="overflow-x:auto;margin-top:.5rem">
-          <table style="width:100%;border-collapse:collapse;font-size:.8rem">
-            <thead>
-              <tr style="background:var(--surface);text-align:left">
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Name</th>
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Phone</th>
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Email</th>
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Position</th>
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Project Role</th>
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">Access</th>
-                <th style="padding:.4rem .6rem;border-bottom:1px solid var(--border)"></th>
-              </tr>
-            </thead>
-            <tbody id="pd-contacts-body">${contactRows}</tbody>
-          </table>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-top:.85rem">
-          <input type="text"  id="pd-c-name"     placeholder="Name *"         style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <input type="tel"   id="pd-c-phone"    placeholder="Phone"          style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <input type="email" id="pd-c-email"    placeholder="Email"          style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <input type="text"  id="pd-c-position" placeholder="Position"       style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <input type="text"  id="pd-c-role"     placeholder="Project Role"   style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
-          <select id="pd-c-access" style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)">
-            <option value="full">Full</option>
-            <option value="limited">Limited</option>
-          </select>
-        </div>
-        <button class="btn btn-primary btn-sm" id="pd-add-contact" style="margin-top:.5rem">&#43; Add Contact</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-top:.6rem">
+        <input type="text"  id="pd-c-name"     placeholder="Name *"       style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <input type="tel"   id="pd-c-phone"    placeholder="Phone"        style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <input type="email" id="pd-c-email"    placeholder="Email"        style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <input type="text"  id="pd-c-position" placeholder="Position"     style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <input type="text"  id="pd-c-role"     placeholder="Project Role" style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <select id="pd-c-access" style="padding:.38rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)">
+          <option value="full">Full</option>
+          <option value="limited">Limited</option>
+        </select>
       </div>
+      <button class="btn btn-primary btn-sm" id="pd-add-contact" style="margin-top:.5rem">&#43; Add Contact</button>
 
       <div class="modal-actions" style="margin-top:.75rem">
         <button class="btn btn-ghost" id="pd-close">Close</button>
@@ -4997,40 +5051,6 @@ function openProjectDetailsModal(projectId) {
 
     document.getElementById('pd-close').addEventListener('click', () => modal.remove());
 
-    // Add document link
-    document.getElementById('pd-add-doc').addEventListener('click', () => {
-      const name = document.getElementById('pd-doc-name').value.trim();
-      const url  = document.getElementById('pd-doc-url').value.trim();
-      if (!name) { alert('Please enter a link name.'); return; }
-      if (!url)  { alert('Please paste a Google Drive link.'); return; }
-      const list = getProjects();
-      const idx  = list.findIndex(x => x.id === projectId);
-      if (idx === -1) return;
-      if (!list[idx].details) list[idx].details = {};
-      if (!list[idx].details.salesDocs) list[idx].details.salesDocs = salesDocs.slice();
-      list[idx].details.salesDocs.push({ id: genId(), name, url });
-      // Clear legacy single-link field
-      delete list[idx].details.salesDriveLink;
-      saveProjects(list);
-      modal.remove();
-      buildModal();
-    });
-
-    // Remove document link
-    modal.querySelectorAll('.remove-doc-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const list = getProjects();
-        const idx  = list.findIndex(x => x.id === projectId);
-        if (idx === -1) return;
-        if (!list[idx].details.salesDocs) list[idx].details.salesDocs = salesDocs.slice();
-        list[idx].details.salesDocs.splice(parseInt(btn.dataset.idx), 1);
-        saveProjects(list);
-        modal.remove();
-        buildModal();
-      });
-    });
-
-    // Add contact
     document.getElementById('pd-add-contact').addEventListener('click', () => {
       const name = document.getElementById('pd-c-name').value.trim();
       if (!name) { alert('Name is required.'); return; }
@@ -5054,7 +5074,6 @@ function openProjectDetailsModal(projectId) {
       buildModal();
     });
 
-    // Remove contact
     modal.querySelectorAll('.remove-contact-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         if (!confirm('Remove this contact?')) return;
@@ -5062,6 +5081,155 @@ function openProjectDetailsModal(projectId) {
         const idx  = list.findIndex(x => x.id === projectId);
         if (idx === -1) return;
         list[idx].details.contacts.splice(parseInt(btn.dataset.idx), 1);
+        saveProjects(list);
+        modal.remove();
+        buildModal();
+      });
+    });
+  }
+  buildModal();
+}
+
+// ── RECORDINGS MODAL ──────────────────────────────────────────
+async function openRecordingsModal(projectId) {
+  const p = getProjects().find(x => x.id === projectId);
+  if (!p) return;
+
+  // Load hub
+  let hub = null;
+  try {
+    const r = await fetch(`/api/resource-hub/project/${projectId}`);
+    if (r.ok) hub = await r.json();
+  } catch {}
+
+  function buildModal() {
+    const recordings = hub?.recordings || [];
+    const recListHtml = recordings.length === 0
+      ? `<div style="text-align:center;padding:1.2rem 0;color:var(--txt-muted);font-size:.85rem;border:2px dashed var(--border);border-radius:8px">No recordings yet.</div>`
+      : recordings.map((r, i) => `
+          <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;border:1px solid var(--border);border-radius:9px;background:var(--surface);margin-bottom:.4rem">
+            <span style="font-size:1.1rem;flex-shrink:0">&#127909;</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.83rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+              <div style="font-size:.72rem;color:var(--txt-muted)">${r.addedAt ? new Date(r.addedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+            </div>
+            <a href="${r.driveUrl}" target="_blank" rel="noopener" style="font-size:.78rem;color:var(--primary);text-decoration:none;font-weight:600;white-space:nowrap">Open ↗</a>
+            <button class="btn btn-danger btn-sm remove-rec-btn" data-idx="${i}" style="padding:.1rem .35rem;font-size:.7rem;line-height:1">&#10005;</button>
+          </div>`).join('');
+
+    const modal = createModal(`
+      <h3>&#127909; Recordings &mdash; <span style="font-weight:400;font-size:.95rem">${p.title}</span></h3>
+      ${!hub ? `<div style="padding:1rem;text-align:center;color:var(--txt-muted);font-size:.85rem;background:var(--surface);border-radius:8px;margin:.75rem 0">
+        Resource Hub not set up yet. Generate one first via the Hub button.
+      </div>` : `
+      <div style="max-height:260px;overflow-y:auto;margin:.75rem 0;padding-right:.2rem">${recListHtml}</div>
+      <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem">
+        <input type="text" id="rec-name" placeholder="Recording title (e.g. KOM Recording – March 2026)"
+          style="padding:.38rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <input type="url" id="rec-url" placeholder="Google Drive link"
+          style="padding:.38rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+      </div>`}
+      <div class="modal-actions" style="margin-top:.75rem">
+        <button class="btn btn-ghost" id="rec-close">Close</button>
+        ${hub ? `<button class="btn btn-primary" id="rec-add">&#43; Add Recording</button>` : ''}
+      </div>
+    `);
+
+    modal.querySelector('#rec-close').addEventListener('click', () => modal.remove());
+
+    modal.querySelector('#rec-add')?.addEventListener('click', async () => {
+      const name = modal.querySelector('#rec-name').value.trim();
+      const url  = modal.querySelector('#rec-url').value.trim();
+      if (!name) { alert('Please enter a title.'); return; }
+      if (!url)  { alert('Please paste a Google Drive link.'); return; }
+      const newRec = { id: genId(), name, driveUrl: url, addedAt: new Date().toISOString(), addedBy: effectiveUser()?.name || '' };
+      hub.recordings = [...(hub.recordings || []), newRec];
+      try {
+        const r = await fetch(`/api/resource-hub/${hub.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ recordings: hub.recordings }) });
+        hub = await r.json();
+      } catch { alert('Failed to save recording.'); return; }
+      modal.remove();
+      buildModal();
+    });
+
+    modal.querySelectorAll('.remove-rec-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remove this recording?')) return;
+        hub.recordings.splice(parseInt(btn.dataset.idx), 1);
+        try {
+          const r = await fetch(`/api/resource-hub/${hub.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ recordings: hub.recordings }) });
+          hub = await r.json();
+        } catch { alert('Failed to remove recording.'); return; }
+        modal.remove();
+        buildModal();
+      });
+    });
+  }
+
+  buildModal();
+}
+
+// ── FILES MODAL ───────────────────────────────────────────────
+function openFilesModal(projectId) {
+  function buildModal() {
+    const p = getProjects().find(x => x.id === projectId);
+    if (!p) return;
+    const salesDocs = p.details?.salesDocs || (p.details?.salesDriveLink ? [{ id: genId(), name: 'Project Link', url: p.details.salesDriveLink }] : []);
+
+    const filesHtml = salesDocs.length === 0
+      ? `<div style="text-align:center;padding:1.2rem 0;color:var(--txt-muted);font-size:.85rem;border:2px dashed var(--border);border-radius:8px">No files added yet.</div>`
+      : salesDocs.map((d, i) => `
+          <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;border:1px solid var(--border);border-radius:9px;background:var(--surface);margin-bottom:.4rem">
+            <span style="font-size:1.1rem;flex-shrink:0">&#128193;</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.83rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.name}</div>
+            </div>
+            <a href="${d.url}" target="_blank" rel="noopener" style="font-size:.78rem;color:var(--primary);text-decoration:none;font-weight:600;white-space:nowrap">Open ↗</a>
+            <button class="btn btn-danger btn-sm remove-file-btn" data-idx="${i}" style="padding:.1rem .35rem;font-size:.7rem;line-height:1">&#10005;</button>
+          </div>`).join('');
+
+    const modal = createModal(`
+      <h3>&#128193; Files &mdash; <span style="font-weight:400;font-size:.95rem">${p.title}</span></h3>
+      <div style="font-size:.77rem;color:var(--txt-muted);margin-bottom:.75rem">Files are visible to the client on the Resource Hub under "Project Documents".</div>
+      <div style="max-height:260px;overflow-y:auto;margin-bottom:.85rem;padding-right:.2rem">${filesHtml}</div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input type="text" id="file-name" placeholder="Label (e.g. SOW, Proposal…)"
+          style="flex:0 0 180px;padding:.38rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <input type="url" id="file-url" placeholder="Google Drive link"
+          style="flex:1;padding:.38rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--bg);color:var(--txt)" />
+        <button id="file-add" title="Add file" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:2px solid var(--primary);background:var(--primary);color:#fff;font-size:1.1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+      </div>
+      <div class="modal-actions" style="margin-top:.75rem">
+        <button class="btn btn-ghost" id="file-close">Close</button>
+      </div>
+    `);
+
+    modal.querySelector('#file-close').addEventListener('click', () => modal.remove());
+
+    modal.querySelector('#file-add').addEventListener('click', () => {
+      const name = modal.querySelector('#file-name').value.trim();
+      const url  = modal.querySelector('#file-url').value.trim();
+      if (!name) { alert('Please enter a label.'); return; }
+      if (!url)  { alert('Please paste a Google Drive link.'); return; }
+      const list = getProjects();
+      const idx  = list.findIndex(x => x.id === projectId);
+      if (idx === -1) return;
+      if (!list[idx].details) list[idx].details = {};
+      if (!list[idx].details.salesDocs) list[idx].details.salesDocs = salesDocs.slice();
+      list[idx].details.salesDocs.push({ id: genId(), name, url });
+      delete list[idx].details.salesDriveLink;
+      saveProjects(list);
+      modal.remove();
+      buildModal();
+    });
+
+    modal.querySelectorAll('.remove-file-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list = getProjects();
+        const idx  = list.findIndex(x => x.id === projectId);
+        if (idx === -1) return;
+        if (!list[idx].details.salesDocs) list[idx].details.salesDocs = salesDocs.slice();
+        list[idx].details.salesDocs.splice(parseInt(btn.dataset.idx), 1);
         saveProjects(list);
         modal.remove();
         buildModal();
@@ -5090,33 +5258,37 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
     const progress       = Math.round((completedCount / MILESTONES.length) * 100);
 
     // Milestones tab rows
-    const progressRows = MILESTONES.map((m, i) => {
-      const done        = !!milestones[m];
-      const locked      = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
-      const disabled    = isReadOnly || locked;
-      const targetStart = timeline[m]?.startDate || '';
-      const targetEnd   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
-      const actualDate  = timeline[m]?.actualDate || (done ? today : '');
-      return `
-        <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
-          <input type="checkbox" class="ms-check" data-index="${i}" data-milestone="${m}"
-            ${done ? 'checked' : ''} ${disabled ? 'disabled' : ''}
-            style="width:15px;height:15px;accent-color:var(--primary);cursor:${disabled ? 'not-allowed' : 'pointer'}" />
-          <div>
-            <span style="font-size:.72rem;color:var(--txt-muted);font-weight:600;margin-right:.3rem">${i + 1}.</span>
-            <span class="ms-label" style="font-size:.85rem;${done ? 'text-decoration:line-through;color:var(--txt-muted)' : 'font-weight:500'}">${m}</span>
-          </div>
-          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetStart || '—'}</div>
-          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetEnd || '—'}</div>
-          <div style="font-size:.78rem;color:${done ? '#16a34a' : 'var(--txt-muted)'};text-align:center">
-            <span class="ms-actual-display">${actualDate || '—'}</span>
-            <input type="hidden" class="ms-actual" data-milestone="${m}" value="${actualDate}" />
-          </div>
-          <div style="text-align:center;font-size:.85rem">
-            ${locked ? '&#128274;' : done ? '<span style="color:#16a34a;font-weight:700">&#10003;</span>' : i === completedCount ? '<span style="color:var(--accent-orange)">&#9654;</span>' : ''}
-          </div>
-        </div>`;
-    }).join('');
+    const canEditActual = can('edit_actual_dates');
+    function buildProgressRowsHtml(tl) {
+      return MILESTONES.map((m, i) => {
+        const done        = !!milestones[m];
+        const locked      = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
+        const disabled    = isReadOnly || locked;
+        const targetStart = tl[m]?.startDate || '';
+        const targetEnd   = tl[m]?.endDate || tl[m]?.targetDate || '';
+        const actualDate  = tl[m]?.actualDate || (done ? today : '');
+        const actualCell  = canEditActual
+          ? `<input type="date" class="ms-actual" data-milestone="${m}" value="${actualDate}" style="font-size:.75rem;border:1px solid var(--border);border-radius:4px;padding:1px 4px;background:var(--bg);color:${done ? '#16a34a' : 'var(--txt)'};width:118px" />`
+          : `<span class="ms-actual-display" style="color:${done ? '#16a34a' : 'var(--txt-muted)'}">${actualDate || '—'}</span><input type="hidden" class="ms-actual" data-milestone="${m}" value="${actualDate}" />`;
+        return `
+          <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 130px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
+            <input type="checkbox" class="ms-check" data-index="${i}" data-milestone="${m}"
+              ${done ? 'checked' : ''} ${disabled ? 'disabled' : ''}
+              style="width:15px;height:15px;accent-color:var(--primary);cursor:${disabled ? 'not-allowed' : 'pointer'}" />
+            <div>
+              <span style="font-size:.72rem;color:var(--txt-muted);font-weight:600;margin-right:.3rem">${i + 1}.</span>
+              <span class="ms-label" style="font-size:.85rem;${done ? 'text-decoration:line-through;color:var(--txt-muted)' : 'font-weight:500'}">${m}</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetStart || '—'}</div>
+            <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetEnd || '—'}</div>
+            <div style="font-size:.78rem;text-align:center">${actualCell}</div>
+            <div style="text-align:center;font-size:.85rem">
+              ${locked ? '&#128274;' : done ? '<span style="color:#16a34a;font-weight:700">&#10003;</span>' : i === completedCount ? '<span style="color:var(--accent-orange)">&#9654;</span>' : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+    const progressRows = buildProgressRowsHtml(timeline);
 
     // Timeline tab rows — use active template if set
     const pfActiveTplId  = p.timelineTemplate || '';
@@ -5184,7 +5356,7 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
           </div>
           <div class="progress-bar-wrap" style="height:10px"><div class="progress-bar" id="pf-ms-progress-bar" style="width:${progress}%"></div></div>
         </div>
-        <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
+        <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 130px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
           <div></div><div>Milestone</div><div style="text-align:center">Target Start</div><div style="text-align:center">Target End</div><div style="text-align:center">Actual</div><div></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:.35rem" id="pf-ms-list">${progressRows}</div>
@@ -5278,6 +5450,14 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
         ['milestones','timeline','documents','details'].forEach(t => {
           modal.querySelector(`#pf-tab-${t}`).style.display = btn.dataset.tab === t ? 'block' : 'none';
         });
+        // Re-render progress rows with live planning dates on every switch to milestones
+        if (btn.dataset.tab === 'milestones') {
+          const liveTimeline = collectTimeline();
+          syncTemplateToMilestones(liveTimeline, getPfActivePhases());
+          modal.querySelector('#pf-ms-list').innerHTML = buildProgressRowsHtml(liveTimeline);
+          attachMsCheckListeners();
+          refreshProgressRows();
+        }
       });
     });
 
@@ -5314,7 +5494,8 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       modal.querySelector('#pf-ms-progress-label').textContent = `${checkedCount}/${MILESTONES.length}   ${pct}%`;
     }
 
-    if (!isReadOnly) {
+    function attachMsCheckListeners() {
+      if (isReadOnly) return;
       modal.querySelectorAll('.ms-check').forEach((cb, i) => {
         cb.addEventListener('change', () => {
           if (!cb.checked) {
@@ -5324,6 +5505,7 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
         });
       });
     }
+    attachMsCheckListeners();
 
     // Timeline helpers
     function collectTimeline() {
@@ -7884,6 +8066,9 @@ function renderAccessMatrix(container) {
         { key: 'create_delete_projects', label: 'Create / Delete Projects' },
         { key: 'edit_projects',          label: 'Edit Projects' },
         { key: 'edit_milestones',        label: 'Edit Milestones' },
+        { key: 'edit_actual_dates',      label: 'Edit Actual Completion Dates' },
+        { key: 'manage_recordings',      label: 'Manage Recordings (add/remove)' },
+        { key: 'manage_files',           label: 'Manage Files & Project Links' },
         { key: 'log_time',               label: 'Log Time' },
         { key: 'view_project_details',   label: 'View Project Details (Docs & Contacts)' },
         { key: 'view_resource_hub',      label: 'View Resource Hub (read-only)' },
@@ -8124,33 +8309,37 @@ function openMilestonesModal(projectId) {
   const planningRows = buildPlanningRows(timeline, milestones, isReadOnly, activePhases);
 
   // ── Tab 2: Progress Tracking rows ─────────────────────────────
-  const progressRows = MILESTONES.map((m, i) => {
-    const done        = !!milestones[m];
-    const locked      = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
-    const disabled    = isReadOnly || locked;
-    const targetStart = timeline[m]?.startDate || '';
-    const targetEnd   = timeline[m]?.endDate || timeline[m]?.targetDate || '';
-    const actualDate  = timeline[m]?.actualDate || (done ? today : '');
-    return `
-      <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
-        <input type="checkbox" class="ms-check" data-index="${i}" data-milestone="${m}"
-          ${done ? 'checked' : ''} ${disabled ? 'disabled' : ''}
-          style="width:15px;height:15px;accent-color:var(--primary);cursor:${disabled ? 'not-allowed' : 'pointer'}" />
-        <div>
-          <span style="font-size:.72rem;color:var(--txt-muted);font-weight:600;margin-right:.3rem">${i + 1}.</span>
-          <span class="ms-label" style="font-size:.85rem;${done ? 'text-decoration:line-through;color:var(--txt-muted)' : 'font-weight:500'}">${m}</span>
-        </div>
-        <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetStart || '—'}</div>
-        <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetEnd || '—'}</div>
-        <div style="font-size:.78rem;color:${done ? '#16a34a' : 'var(--txt-muted)'};text-align:center">
-          <span class="ms-actual-display">${actualDate || '—'}</span>
-          <input type="hidden" class="ms-actual" data-milestone="${m}" value="${actualDate}" />
-        </div>
-        <div style="text-align:center;font-size:.85rem">
-          ${locked ? '&#128274;' : done ? '<span style="color:#16a34a;font-weight:700">&#10003;</span>' : i === completedCount ? '<span style="color:var(--accent-orange)">&#9654;</span>' : ''}
-        </div>
-      </div>`;
-  }).join('');
+  const canEditActual = can('edit_actual_dates');
+  function buildProgressRowsHtml(tl) {
+    return MILESTONES.map((m, i) => {
+      const done        = !!milestones[m];
+      const locked      = !isReadOnly && i > 0 && !milestones[MILESTONES[i - 1]];
+      const disabled    = isReadOnly || locked;
+      const targetStart = tl[m]?.startDate || '';
+      const targetEnd   = tl[m]?.endDate || tl[m]?.targetDate || '';
+      const actualDate  = tl[m]?.actualDate || (done ? today : '');
+      const actualCell  = canEditActual
+        ? `<input type="date" class="ms-actual" data-milestone="${m}" value="${actualDate}" style="font-size:.75rem;border:1px solid var(--border);border-radius:4px;padding:1px 4px;background:var(--bg);color:${done ? '#16a34a' : 'var(--txt)'};width:118px" />`
+        : `<span class="ms-actual-display" style="color:${done ? '#16a34a' : 'var(--txt-muted)'}">${actualDate || '—'}</span><input type="hidden" class="ms-actual" data-milestone="${m}" value="${actualDate}" />`;
+      return `
+        <div class="ms-row" data-index="${i}" style="display:grid;grid-template-columns:20px 1fr 100px 100px 130px 50px;gap:.6rem;align-items:center;padding:.55rem .9rem;border-radius:8px;border:1.5px solid ${done ? '#86efac' : 'var(--border)'};background:${done ? '#f0fdf4' : locked ? '#fafafa' : 'var(--bg)'};opacity:${locked ? '.5' : '1'};transition:all .15s">
+          <input type="checkbox" class="ms-check" data-index="${i}" data-milestone="${m}"
+            ${done ? 'checked' : ''} ${disabled ? 'disabled' : ''}
+            style="width:15px;height:15px;accent-color:var(--primary);cursor:${disabled ? 'not-allowed' : 'pointer'}" />
+          <div>
+            <span style="font-size:.72rem;color:var(--txt-muted);font-weight:600;margin-right:.3rem">${i + 1}.</span>
+            <span class="ms-label" style="font-size:.85rem;${done ? 'text-decoration:line-through;color:var(--txt-muted)' : 'font-weight:500'}">${m}</span>
+          </div>
+          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetStart || '—'}</div>
+          <div style="font-size:.78rem;color:var(--txt-muted);text-align:center">${targetEnd || '—'}</div>
+          <div style="font-size:.78rem;text-align:center">${actualCell}</div>
+          <div style="text-align:center;font-size:.85rem">
+            ${locked ? '&#128274;' : done ? '<span style="color:#16a34a;font-weight:700">&#10003;</span>' : i === completedCount ? '<span style="color:var(--accent-orange)">&#9654;</span>' : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+  const progressRows = buildProgressRowsHtml(timeline);
 
   const modal = createModal(`
     <h3>&#9873; ${p.title}</h3>
@@ -8190,7 +8379,7 @@ function openMilestonesModal(projectId) {
           <div class="progress-bar" id="ms-progress-bar" style="width:${progress}%"></div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 100px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
+      <div style="display:grid;grid-template-columns:20px 1fr 100px 100px 130px 50px;gap:.5rem;padding:.3rem .9rem;font-size:.7rem;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.05em">
         <div></div><div>Milestone</div><div style="text-align:center">Target Start</div><div style="text-align:center">Target End</div><div style="text-align:center">Actual</div><div></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.35rem" id="ms-list">${progressRows}</div>
@@ -8219,6 +8408,14 @@ function openMilestonesModal(projectId) {
       btn.style.color = 'var(--txt)';
       document.getElementById('tab-plan').style.display      = btn.dataset.tab === 'plan'     ? 'block' : 'none';
       document.getElementById('tab-progress').style.display  = btn.dataset.tab === 'progress' ? 'block' : 'none';
+      // Re-render progress rows with live planning dates on every switch
+      if (btn.dataset.tab === 'progress') {
+        const liveTimeline = collectTimeline();
+        syncTemplateToMilestones(liveTimeline, getMsActivePhases());
+        modal.querySelector('#ms-list').innerHTML = buildProgressRowsHtml(liveTimeline);
+        attachMsCheckListeners();
+        refreshProgressRows();
+      }
     });
   });
 
@@ -8257,7 +8454,8 @@ function openMilestonesModal(projectId) {
     document.getElementById('ms-progress-label').textContent   = `${checkedCount}/${MILESTONES.length}   ${pct}%`;
   }
 
-  if (!isReadOnly) {
+  function attachMsCheckListeners() {
+    if (isReadOnly) return;
     modal.querySelectorAll('.ms-check').forEach((cb, i) => {
       cb.addEventListener('change', () => {
         if (!cb.checked) {
@@ -8267,6 +8465,7 @@ function openMilestonesModal(projectId) {
       });
     });
   }
+  attachMsCheckListeners();
 
   // ── Save target dates (Tab 1) ──────────────────────────────────
   function collectTimeline() {

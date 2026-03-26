@@ -31,6 +31,7 @@ const DEFAULT_PERMISSIONS = {
     create_delete_projects:  true,
     edit_projects:           true,
     edit_milestones:         true,
+    edit_actual_dates:       true,
     act_as_user:             true,
     log_time:                true,
     view_audit_trail:        true,
@@ -39,6 +40,8 @@ const DEFAULT_PERMISSIONS = {
     generate_resource_hub:   true,
     edit_dashboard_fields:   true,
     view_pm_dashboard_table: false,
+    manage_recordings:       false,
+    manage_files:            false,
   },
   lead: {
     view_admin_dashboard:    true,
@@ -51,6 +54,7 @@ const DEFAULT_PERMISSIONS = {
     create_delete_projects:  true,
     edit_projects:           true,
     edit_milestones:         true,
+    edit_actual_dates:       true,
     act_as_user:             false,
     log_time:                true,
     view_audit_trail:        false,
@@ -59,6 +63,8 @@ const DEFAULT_PERMISSIONS = {
     generate_resource_hub:   false,
     edit_dashboard_fields:   true,
     view_pm_dashboard_table: false,
+    manage_recordings:       false,
+    manage_files:            false,
   },
   project_manager: {
     view_admin_dashboard:    false,
@@ -71,6 +77,7 @@ const DEFAULT_PERMISSIONS = {
     create_delete_projects:  false,
     edit_projects:           true,
     edit_milestones:         true,
+    edit_actual_dates:       true,
     act_as_user:             false,
     log_time:                true,
     view_audit_trail:        false,
@@ -79,6 +86,8 @@ const DEFAULT_PERMISSIONS = {
     generate_resource_hub:   true,
     edit_dashboard_fields:   true,
     view_pm_dashboard_table: true,
+    manage_recordings:       false,
+    manage_files:            false,
   },
   implementer: {
     view_admin_dashboard:    false,
@@ -91,6 +100,7 @@ const DEFAULT_PERMISSIONS = {
     create_delete_projects:  false,
     edit_projects:           false,
     edit_milestones:         true,
+    edit_actual_dates:       false,
     act_as_user:             false,
     log_time:                true,
     view_audit_trail:        false,
@@ -99,6 +109,8 @@ const DEFAULT_PERMISSIONS = {
     generate_resource_hub:   false,
     edit_dashboard_fields:   false,
     view_pm_dashboard_table: false,
+    manage_recordings:       false,
+    manage_files:            false,
   },
 };
 

@@ -1015,10 +1015,55 @@ tbody td { padding: .55rem .8rem; vertical-align: middle; }
 }
 .kanban-card-actions {
   display: flex;
-  gap: .3rem;
-  flex-wrap: wrap;
-  margin-top: .15rem;
+  gap: .4rem;
+  align-items: center;
+  margin-top: .3rem;
 }
+.kcard-more-wrap {
+  position: relative;
+  display: inline-block;
+}
+.kcard-more-btn {
+  font-size: 1.1rem;
+  line-height: 1;
+  letter-spacing: .08em;
+  padding: .18rem .55rem !important;
+  color: var(--txt-muted) !important;
+}
+.kcard-more-btn:hover { color: var(--txt) !important; }
+.kcard-dropdown {
+  display: none;
+  position: fixed;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 6px 20px rgba(9,41,3,.14);
+  z-index: 9999;
+  min-width: 160px;
+  padding: .3rem 0;
+  overflow: hidden;
+}
+.kcard-dropdown.open { display: block; }
+.kcard-drop-item {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  width: 100%;
+  padding: .42rem .85rem;
+  font-size: .8rem;
+  font-family: var(--font-sub);
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--txt);
+  text-align: left;
+  transition: background .1s;
+  white-space: nowrap;
+}
+.kcard-drop-item:hover { background: var(--surface); }
+.kcard-drop-item img { width: 14px; height: 14px; object-fit: contain; }
+.kcard-drop-item.item-danger { color: var(--danger); }
 .docs-count {
   display: inline-flex;
   align-items: center;
