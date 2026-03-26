@@ -42,7 +42,15 @@
       }
     ],
     "recordings": [],
-    "updatedAt": "2026-03-23T09:05:01.463Z"
+    "updatedAt": "2026-03-25T13:02:46.072Z",
+    "limitedSections": {
+      "milestones": true,
+      "timeline": true,
+      "documents": true,
+      "recordings": true,
+      "contacts": true,
+      "ticketing": true
+    }
   },
   {
     "id": "a775dcde514b",
@@ -73,5 +81,305 @@
     "ticketingNote": "",
     "accessList": [],
     "recordings": []
+  },
+  {
+    "id": "223b7085e025",
+    "slug": "upson-global-inc-b1ctor",
+    "projectId": "hs_51981470616",
+    "projectTitle": "Upson Global Inc.",
+    "createdAt": "2026-03-25T13:03:22.904Z",
+    "createdBy": "mmj4wcs359kz",
+    "createdByName": "Louie Anthony See",
+    "isPublic": true,
+    "sections": {
+      "milestones": true,
+      "timeline": true,
+      "documents": true,
+      "recordings": true,
+      "contacts": true,
+      "ticketing": true
+    },
+    "limitedSections": {
+      "milestones": true,
+      "timeline": true,
+      "documents": true,
+      "recordings": true,
+      "contacts": true,
+      "ticketing": true
+    },
+    "ticketingUrl": "",
+    "ticketingNote": "",
+    "accessList": [
+      {
+        "contactId": "mmj4wcs359kz",
+        "name": "Louie Anthony See",
+        "email": "lsee@sprout.ph",
+        "accessLevel": "full",
+        "addedAt": "2026-03-25T13:03:22.903Z",
+        "isPM": true,
+        "hasPassword": true
+      }
+    ],
+    "recordings": [],
+    "accessLog": [],
+    "updatedAt": "2026-03-25T13:03:53.186Z"
+  },
+  {
+    "id": "db6564d88d56",
+    "slug": "test-project-3-y6ah9t",
+    "projectId": "mmj4zvaygyej",
+    "projectTitle": "Test Project 3",
+    "createdAt": "2026-03-25T13:05:58.316Z",
+    "createdBy": "mmj4wcs359kz",
+    "createdByName": "Louie Anthony See",
+    "isPublic": true,
+    "sections": {
+      "milestones": true,
+      "timeline": true,
+      "documents": true,
+      "recordings": true,
+      "contacts": true,
+      "ticketing": true
+    },
+    "limitedSections": {
+      "milestones": true,
+      "timeline": true,
+      "documents": true,
+      "recordings": true,
+      "contacts": true,
+      "ticketing": true
+    },
+    "ticketingUrl": "",
+    "ticketingNote": "",
+    "accessList": [
+      {
+        "contactId": "mmj4wcs359kz",
+        "name": "Louie Anthony See",
+        "email": "lsee@sprout.ph",
+        "accessLevel": "full",
+        "addedAt": "2026-03-25T13:05:58.316Z",
+        "isPM": true,
+        "hasPassword": false,
+        "lastAccess": "2026-03-25T16:42:26.810Z"
+      },
+      {
+        "contactId": "mn6240g4w56f",
+        "name": "Mark Brainard Gregorio",
+        "email": "markbrainardg@sprout.ph",
+        "accessLevel": "full",
+        "addedAt": "2026-03-25T13:05:58.316Z",
+        "hasPassword": true,
+        "passwordHash": "$2a$10$E/wcAfEQncLzYwkYggYcm.JFZqCno1l6cMFTbCL7ClJG9eqTf.GqG",
+        "lastAccess": "2026-03-26T05:04:06.534Z"
+      }
+    ],
+    "recordings": [
+      {
+        "id": "mn6w6shhj1ax",
+        "name": "Kickoff Meeting",
+        "driveUrl": "https://drive.google.com/file/d/1HhsipHfF4rCjnhlVmagMck0lBHFgKmtF/view?usp=sharing",
+        "addedAt": "2026-03-26T03:07:45.461Z",
+        "addedBy": "Louie Anthony See"
+      }
+    ],
+    "accessLog": [
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T05:04:06.392Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T05:03:37.219Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "lsee",
+        "timestamp": "2026-03-26T05:03:31.540Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T04:31:18.153Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T04:01:04.836Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T03:59:34.757Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T03:55:59.110Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T03:51:11.846Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "lsee",
+        "timestamp": "2026-03-26T03:51:04.328Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T03:48:59.756Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-26T03:09:24.863Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:57:15.020Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:56:13.668Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:48:01.498Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainard@sprout.ph",
+        "timestamp": "2026-03-25T16:47:12.117Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainard@sprout.ph",
+        "timestamp": "2026-03-25T16:47:10.734Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainard@sprout.ph",
+        "timestamp": "2026-03-25T16:46:41.192Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainard@sprout.ph",
+        "timestamp": "2026-03-25T16:46:39.992Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:44:07.954Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:43:29.175Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:43:16.845Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T16:42:47.024Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "lsee@sprout.ph",
+        "timestamp": "2026-03-25T16:42:26.810Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "lsee@sprout.ph",
+        "timestamp": "2026-03-25T16:22:32.848Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "lsee",
+        "timestamp": "2026-03-25T16:22:23.663Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "lsee@sprout.ph",
+        "timestamp": "2026-03-25T13:12:34.260Z",
+        "ip": "127.0.0.1",
+        "success": true,
+        "reason": "ok"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T13:12:18.947Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      },
+      {
+        "email": "markbrainardg@sprout.ph",
+        "timestamp": "2026-03-25T13:12:06.093Z",
+        "ip": "127.0.0.1",
+        "success": false,
+        "reason": "email_not_found"
+      }
+    ],
+    "updatedAt": "2026-03-26T03:07:45.574Z"
   }
 ]

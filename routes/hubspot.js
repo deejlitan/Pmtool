@@ -1,5 +1,5 @@
 const express = require('express');
-const { getUsers, getIntegrations, getProjects } = require('../db');
+const { getUsers, getIntegrations, getProjects, saveProjects, getPermissions } = require('../db');
 
 const router = express.Router();
 const HS = 'https://api.hubapi.com';
@@ -28,8 +28,108 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireHubspotAccess(req, res, next) {
+  const user = getUsers().find(u => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ error: 'Not logged in.' });
+  const perms = getPermissions();
+  const allowed = perms[user.role]?.view_hubspot === true;
+  if (!allowed) return res.status(403).json({ error: 'HubSpot access not granted for your role.' });
+  next();
+}
+
 // Only these client_stage values are pulled
 const ACTIVE_STAGES = ['Sales Handover', 'Customer Onboarding', 'implem_upsell_onboarding', 'Customer Success'];
+
+// Only this stage triggers auto-sync to local DB
+const AUTO_SYNC_STAGE = 'Customer Onboarding';
+
+function hsStatusToLocal(clientStatus, stage) {
+  const s = (clientStatus || stage || '').toLowerCase().trim();
+  if (s.includes('churn'))                         return 'churn';
+  if (s.includes('on hold') || s.includes('hold')) return 'on-hold';
+  if (s.includes('return') || s.includes('sales')) return 'on-hold-sales';
+  if (s.includes('complet'))                       return 'completed';
+  return 'ongoing';
+}
+
+function resolveToLocalUser(raw, users) {
+  if (!raw) return null;
+  return users.find(u =>
+    (u.hubspotOwnerId && u.hubspotOwnerId === raw) ||
+    (u.email && u.email.toLowerCase() === raw.toLowerCase())
+  ) || null;
+}
+
+// Shared auto-sync — called by both the background refresh and the manual Refresh button.
+// Only Customer Onboarding companies are written to the local DB.
+function autoSyncCustomerOnboarding(deals) {
+  const coDeals = deals.filter(d => d.stage === AUTO_SYNC_STAGE);
+  if (!coDeals.length) return;
+
+  const users    = getUsers();
+  const existing = getProjects();
+  let added = 0, updated = 0;
+
+  coDeals.forEach(deal => {
+    const matchedPm      = deal.ownerHubspotId ? resolveToLocalUser(deal.ownerHubspotId, users) : null;
+    const projectManager = matchedPm?.id || null;
+
+    const implUsers = [
+      resolveToLocalUser(deal.hrImplementerRaw,       users),
+      resolveToLocalUser(deal.payrollImplementerRaw,  users),
+      resolveToLocalUser(deal.payrollMasterRaw,       users),
+      resolveToLocalUser(deal.softwareImplementerRaw, users),
+    ].filter(Boolean);
+    const hsAssigned = [...new Set(implUsers.map(u => u.id))];
+
+    const idx = existing.findIndex(p =>
+      p.hubspotId === deal.id || p.id === `hs_${deal.id}`
+    );
+
+    if (idx === -1) {
+      existing.push({
+        id:             `hs_${deal.id}`,
+        title:          deal.name,
+        description:    `Auto-synced from HubSpot — ${deal.stage}`,
+        status:         hsStatusToLocal(deal.clientStatus, deal.stage),
+        priority:       'medium',
+        projectManager,
+        hubspotOwnerId: deal.ownerHubspotId || null,
+        assignedTo:     hsAssigned,
+        dueDate:        '',
+        progress:       0,
+        createdBy:      'hubspot',
+        hubspotId:      deal.id,
+        hubspotStage:   deal.stage,
+        projectType:    'client',
+        syncedAt:       new Date().toISOString(),
+        milestones:     {},
+        timeline:       {},
+      });
+      added++;
+    } else {
+      const proj = existing[idx];
+      const manuallyAdded = (proj.assignedTo || []).filter(id =>
+        !hsAssigned.includes(id) && id !== (projectManager || proj.projectManager)
+      );
+      existing[idx] = {
+        ...proj,
+        title:          deal.name,
+        status:         hsStatusToLocal(deal.clientStatus, deal.stage),
+        hubspotStage:   deal.stage,
+        hubspotOwnerId: deal.ownerHubspotId || null,
+        projectManager: projectManager || proj.projectManager,
+        assignedTo:     [...new Set([...hsAssigned, ...manuallyAdded])],
+      };
+      updated++;
+    }
+  });
+
+  if (added > 0 || updated > 0) {
+    saveProjects(existing);
+    console.log(`[HubSpot] Auto-sync: ${added} new, ${updated} updated (Customer Onboarding only).`);
+  }
+}
 
 function buildSearchBody(after) {
   return {
@@ -87,7 +187,14 @@ router.get('/my-deals', requireAuth, (req, res) => {
       .filter(Boolean)
   );
 
-  const myDeals = (dealsCache.deals || []).filter(d => myHsIds.has(String(d.id)));
+  // Also match deals directly by HubSpot owner ID — catches projects that exist in
+  // HubSpot with this user as PM but haven't been imported into the local database yet.
+  const userHsId = user.hubspotOwnerId || null;
+
+  const myDeals = (dealsCache.deals || []).filter(d =>
+    myHsIds.has(String(d.id)) ||
+    (userHsId && (d.ownerHubspotId === userHsId || d.coProjectManagerHsId === userHsId))
+  );
   res.json({ pipeline: dealsCache.pipeline, deals: myDeals });
 });
 
@@ -96,7 +203,7 @@ router.get('/my-deals', requireAuth, (req, res) => {
    "Sales Handover", "Customer Onboarding", or "implem_upsell_onboarding".
    Only the six requested internal properties are pulled.
 ─────────────────────────────────────────────────────────────── */
-router.get('/deals', requireAuth, requireAdmin, async (req, res) => {
+router.get('/deals', requireAuth, requireHubspotAccess, async (req, res) => {
   // Serve from cache unless a forced refresh is requested
   const forceRefresh = req.query.refresh === 'true';
   if (!forceRefresh && dealsCache) {
@@ -115,9 +222,13 @@ router.get('/deals', requireAuth, requireAdmin, async (req, res) => {
     ]);
 
     const ownerMap = {};
+    const emailMap = {};
     (ownersData.results || []).forEach(o => {
-      ownerMap[o.id] = (`${o.firstName || ''} ${o.lastName || ''}`).trim() || o.email || 'Unknown';
+      const name = (`${o.firstName || ''} ${o.lastName || ''}`).trim() || o.email || 'Unknown';
+      ownerMap[o.id] = name;
+      if (o.email) emailMap[o.email.toLowerCase()] = name;
     });
+    const resolveOwnerField = v => v ? (ownerMap[v] || emailMap[v?.toLowerCase()] || v) : '';
 
     if (!firstPage.results) {
       return res.status(502).json({ error: 'Could not reach HubSpot. Check your token.' });
@@ -162,8 +273,8 @@ router.get('/deals', requireAuth, requireAdmin, async (req, res) => {
         clientStatus:            p.client_status                || '',
         coProjectManager:        coPmHsId ? (ownerMap[coPmHsId] || 'Unknown') : '',
         coProjectManagerHsId:    coPmHsId || null,
-        hrImplementer:           p.hr_software_implementer      || '',
-        payrollImplementer:      p.payroll_software_implementer || '',
+        hrImplementer:           resolveOwnerField(p.hr_software_implementer),
+        payrollImplementer:      resolveOwnerField(p.payroll_software_implementer),
         amount:                  p.mrr                          || null,
         onboardingDate:          null,
         // new fields
@@ -179,8 +290,13 @@ router.get('/deals', requireAuth, requireAdmin, async (req, res) => {
         productsAvailed:         p.products_availed__main_services_  || '',
         industry:                p.industry__sprout_official_2025    || '',
         address:                 p.address                           || '',
-        payrollMaster:           p.payroll_master                    || '',
-        softwareImplementer:     p.software_implementation_officer_  || '',
+        payrollMaster:           resolveOwnerField(p.payroll_master),
+        softwareImplementer:     resolveOwnerField(p.software_implementation_officer_),
+        // raw IDs/emails for local user matching during sync
+        hrImplementerRaw:        p.hr_software_implementer           || '',
+        payrollImplementerRaw:   p.payroll_software_implementer      || '',
+        payrollMasterRaw:        p.payroll_master                    || '',
+        softwareImplementerRaw:  p.software_implementation_officer_  || '',
         // retained for sync compatibility
         closeDate:               null,
         description:             '',
@@ -192,6 +308,9 @@ router.get('/deals', requireAuth, requireAdmin, async (req, res) => {
     // Store in cache
     dealsCache     = response;
     dealsCacheTime = Date.now();
+
+    // Auto-sync Customer Onboarding companies to local DB on every forced refresh
+    autoSyncCustomerOnboarding(deals);
 
     res.json(response);
 
@@ -205,7 +324,7 @@ router.get('/deals', requireAuth, requireAdmin, async (req, res) => {
    Returns a map of HubSpot owner ID → display name.
    Used by the client-side PM migration to resolve raw IDs.
 ─────────────────────────────────────────────────────────────── */
-router.get('/owners', requireAuth, requireAdmin, async (req, res) => {
+router.get('/owners', requireAuth, requireHubspotAccess, async (req, res) => {
   try {
     const ownersRes  = await fetch(`${HS}/crm/v3/owners?limit=500`, { headers: hsHeaders() });
     const ownersData = await ownersRes.json();
@@ -223,21 +342,12 @@ router.get('/owners', requireAuth, requireAdmin, async (req, res) => {
 /* ── POST /api/hubspot/sync ───────────────────────────────────
    Converts selected companies into local project records.
 ─────────────────────────────────────────────────────────────── */
-router.post('/sync', requireAuth, requireAdmin, (req, res) => {
+router.post('/sync', requireAuth, requireHubspotAccess, (req, res) => {
   const { deals, mappings = {} } = req.body;
   if (!Array.isArray(deals) || !deals.length)
     return res.status(400).json({ error: 'No companies provided.' });
 
   const users = getUsers();
-
-  function hsStatusToLocal(clientStatus, stage) {
-    const s = (clientStatus || stage || '').toLowerCase().trim();
-    if (s.includes('churn'))                         return 'churn';
-    if (s.includes('on hold') || s.includes('hold')) return 'on-hold';
-    if (s.includes('return') || s.includes('sales')) return 'on-hold-sales';
-    if (s.includes('complet'))                       return 'completed';
-    return 'ongoing';
-  }
 
   const projects = deals.map(deal => {
     // Match by HubSpot owner ID stored on local user, then fall back to manual mappings
@@ -281,9 +391,13 @@ async function refreshHubSpotCache() {
     ]);
 
     const ownerMap = {};
+    const emailMap = {};
     (ownersData.results || []).forEach(o => {
-      ownerMap[o.id] = (`${o.firstName || ''} ${o.lastName || ''}`).trim() || o.email || 'Unknown';
+      const name = (`${o.firstName || ''} ${o.lastName || ''}`).trim() || o.email || 'Unknown';
+      ownerMap[o.id] = name;
+      if (o.email) emailMap[o.email.toLowerCase()] = name;
     });
+    const resolveOwnerField = v => v ? (ownerMap[v] || emailMap[v?.toLowerCase()] || v) : '';
 
     if (!firstPage.results) return;
 
@@ -315,8 +429,8 @@ async function refreshHubSpotCache() {
         clientStatus: p.client_status || '',
         coProjectManager: coPmHsId ? (ownerMap[coPmHsId] || 'Unknown') : '',
         coProjectManagerHsId: coPmHsId || null,
-        hrImplementer: p.hr_software_implementer || '',
-        payrollImplementer: p.payroll_software_implementer || '',
+        hrImplementer: resolveOwnerField(p.hr_software_implementer),
+        payrollImplementer: resolveOwnerField(p.payroll_software_implementer),
         amount: p.mrr || null, onboardingDate: null,
         segment: p.segment__sprout_current_ || '',
         salesperson: ownerMap[p.hrtc] || p.hrtc || '',
@@ -330,8 +444,12 @@ async function refreshHubSpotCache() {
         productsAvailed: p.products_availed__main_services_ || '',
         industry: p.industry__sprout_official_2025 || '',
         address: p.address || '',
-        payrollMaster: p.payroll_master || '',
-        softwareImplementer: p.software_implementation_officer_ || '',
+        payrollMaster: resolveOwnerField(p.payroll_master),
+        softwareImplementer: resolveOwnerField(p.software_implementation_officer_),
+        hrImplementerRaw:        p.hr_software_implementer           || '',
+        payrollImplementerRaw:   p.payroll_software_implementer      || '',
+        payrollMasterRaw:        p.payroll_master                    || '',
+        softwareImplementerRaw:  p.software_implementation_officer_  || '',
         closeDate: null, description: '',
       };
     });
@@ -339,6 +457,9 @@ async function refreshHubSpotCache() {
     dealsCache     = { pipeline: 'HubSpot Companies', deals };
     dealsCacheTime = Date.now();
     console.log(`[HubSpot] Cache refreshed — ${deals.length} companies loaded at ${new Date().toLocaleTimeString()}.`);
+
+    autoSyncCustomerOnboarding(deals);
+
   } catch (err) {
     console.warn('[HubSpot] Cache refresh failed:', err.message);
   }

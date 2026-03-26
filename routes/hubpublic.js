@@ -485,6 +485,32 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
       </div>
     </section>` : '';
 
+  // ── Timeline Revisions section (visible when versions exist) ──
+  const timelineVersions = project?.timelineVersions || [];
+  const tlRevisionsHtml = timelineVersions.length > 0 ? (() => {
+    const allVersions = [...timelineVersions].reverse(); // newest first
+    const rows = allVersions.map((v, i) => {
+      const isActive = i === 0; // most recent = active
+      return `
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-radius:12px;border:1.5px solid ${isActive ? '#86efac' : '#e4ece4'};background:${isActive ? '#f0fdf4' : '#fafafa'};margin-bottom:8px">
+          <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${isActive ? 'linear-gradient(135deg,#16a34a,#065f46)' : '#e4ece4'};display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:${isActive ? '#fff' : '#5a7a5a'}">v${v.versionNumber}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:.88rem;font-weight:700;color:#092903">${escHtml(v.name)}</span>
+              ${isActive ? `<span style="font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:10px;background:#16a34a;color:#fff">ACTIVE</span>` : ''}
+            </div>
+            ${v.revisionReason ? `<div style="font-size:.79rem;color:#4a7a44;margin-top:3px">📝 ${escHtml(v.revisionReason)}</div>` : ''}
+            <div style="font-size:.73rem;color:#9ab09a;margin-top:3px">Saved ${fmtDate(v.createdAt)} by ${escHtml(v.createdBy)}</div>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+    <section id="timeline-revisions" style="margin-bottom:40px">
+      <div style="font-family:'Fira Sans',sans-serif;font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a7a5a;margin-bottom:14px;border-left:4px solid #16a34a;padding-left:12px">📋 Timeline Revisions</div>
+      <div style="background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 2px 10px rgba(9,41,3,.07)">${rows}</div>
+    </section>`;
+  })() : '';
+
   // ── Recordings section ──
   const recHtml = sections.recordings && canSee('recordings') ? `
     <section id="recordings" style="margin-bottom:40px">
@@ -764,6 +790,7 @@ ${adminBanner}
 
   <!-- ── Lower sections ── -->
   ${docsHtml}
+  ${tlRevisionsHtml}
   ${recHtml}
   ${tickHtml}
   ${ctcHtml}

@@ -26,7 +26,7 @@
     "view_admin_dashboard": true,
     "view_my_dashboard": true,
     "view_pm_dashboard_table": false,
-    "edit_dashboard_fields": true,
+    "edit_dashboard_fields": false,
     "view_all_projects": true,
     "view_my_projects": true,
     "create_delete_projects": true,

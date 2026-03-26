@@ -1076,10 +1076,10 @@ function roleBadge(roleId) {
 }
 
 let permissionsMatrix = {
-  super_admin:     { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:true, view_hubspot:true, manage_users:true, create_delete_projects:true, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:true, log_time:true, view_audit_trail:true, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false },
-  lead:            { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:true, manage_users:false, create_delete_projects:true, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:false, edit_dashboard_fields:true, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false },
-  project_manager: { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:true, manage_recordings:false, manage_files:false },
-  implementer:     { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:false, edit_milestones:true, edit_actual_dates:false, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:false, view_resource_hub:false, generate_resource_hub:false, edit_dashboard_fields:false, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false },
+  super_admin:     { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:true, view_hubspot:true, manage_users:true, create_delete_projects:true, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:true, log_time:true, view_audit_trail:true, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false, view_tools_hub:true },
+  lead:            { view_admin_dashboard:true, view_all_projects:true, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:true, manage_users:false, create_delete_projects:true, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:false, edit_dashboard_fields:false, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false, view_tools_hub:true },
+  project_manager: { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:true, edit_milestones:true, edit_actual_dates:true, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:true, view_resource_hub:true, generate_resource_hub:true, edit_dashboard_fields:true, view_pm_dashboard_table:true, manage_recordings:false, manage_files:false, view_tools_hub:false },
+  implementer:     { view_admin_dashboard:false, view_all_projects:false, view_my_dashboard:true, view_my_projects:true, view_users:false, view_hubspot:false, manage_users:false, create_delete_projects:false, edit_projects:false, edit_milestones:true, edit_actual_dates:false, act_as_user:false, log_time:true, view_audit_trail:false, view_project_details:false, view_resource_hub:false, generate_resource_hub:false, edit_dashboard_fields:false, view_pm_dashboard_table:false, manage_recordings:false, manage_files:false, view_tools_hub:false },
 };
 
 async function fetchPermissions() {
@@ -1491,7 +1491,7 @@ function renderSidebar() {
     { id: 'my-dashboard', label: 'My Dashboard',            icon: '&#9962;',   permission: 'view_my_dashboard'    },
     { id: 'projects',     label: 'Implementation Projects', icon: '&#128193;', permission: 'view_all_projects'    },
     { id: 'my-projects',  label: 'My Projects',             icon: '&#128193;', permission: 'view_my_projects'     },
-    { id: 'tools-hub',    label: 'Tools Hub',               icon: '&#128736;', permission: null                   },
+    { id: 'tools-hub',    label: 'Tools Hub',               icon: '&#128736;', permission: 'view_tools_hub'       },
   ];
 
   const adminItems = [
@@ -1503,7 +1503,7 @@ function renderSidebar() {
   ];
 
   const filteredMain = mainItems.filter(item => {
-    if (item.id === 'tools-hub')    return role === 'super_admin';
+    if (item.id === 'tools-hub')    return can('view_tools_hub');
     if (item.id === 'my-dashboard') return can('view_my_dashboard') && !can('view_admin_dashboard');
     return can(item.permission);
   });
@@ -1626,7 +1626,7 @@ async function navigate(page) {
     await renderAuditTrail(container);
   } else if (page === 'app-settings' && effectiveUser()?.role === 'super_admin') {
     await renderAppSettings(container);
-  } else if (page === 'tools-hub' && effectiveUser()?.role === 'super_admin') {
+  } else if (page === 'tools-hub' && can('view_tools_hub')) {
     renderToolsHub(container);
   }
 
@@ -2311,6 +2311,37 @@ function renderDashCell(col, d, canEdit) {
   return `<td class="${cls}" data-hsid="${escAttr(d.id)}" data-field="${escAttr(col.key)}" data-col-type="${col.type}" data-edit-val="${escAttr(String(editVal))}">${displayHtml}${resetBtn}</td>`;
 }
 
+function syncHubspotAssignedTo(deals) {
+  const existing = getProjects();
+  let changed = false;
+  deals.forEach(deal => {
+    const proj = existing.find(p => p.hubspotId === deal.id || p.id === `hs_${deal.id}`);
+    if (!proj) return;
+    function resolveToLocalUser(raw) {
+      if (!raw) return null;
+      return cachedUsers.find(u =>
+        (u.hubspotOwnerId && u.hubspotOwnerId === raw) ||
+        (u.email && u.email.toLowerCase() === raw.toLowerCase())
+      ) || null;
+    }
+    const implUsers = [
+      resolveToLocalUser(deal.hrImplementerRaw),
+      resolveToLocalUser(deal.payrollImplementerRaw),
+      resolveToLocalUser(deal.payrollMasterRaw),
+      resolveToLocalUser(deal.softwareImplementerRaw),
+    ].filter(Boolean);
+    const hsAssigned = [...new Set(implUsers.map(u => u.id))];
+    const manuallyAdded = (proj.assignedTo || []).filter(id =>
+      !hsAssigned.includes(id) && id !== proj.projectManager
+    );
+    const newAssignedTo = [...new Set([...hsAssigned, ...manuallyAdded])];
+    const prev = JSON.stringify((proj.assignedTo || []).slice().sort());
+    const next = JSON.stringify(newAssignedTo.slice().sort());
+    if (prev !== next) { proj.assignedTo = newAssignedTo; changed = true; }
+  });
+  if (changed) saveProjects(existing);
+}
+
 function refreshDashboard() {
   const container = document.getElementById('page-container');
   renderAdminDashboard(container, true);
@@ -2337,7 +2368,12 @@ async function renderAdminDashboard(container, forceRefresh = false) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
           const data = await res.json();
-          if (res.ok) { deals = data.deals || []; pipelineLabel = data.pipeline || pipelineLabel; }
+          if (res.ok) {
+            deals = data.deals || [];
+            pipelineLabel = data.pipeline || pipelineLabel;
+            // Always sync assignedTo from HubSpot implementer fields
+            syncHubspotAssignedTo(deals);
+          }
           else hsError = data.error || 'Could not load HubSpot data.';
         } else { hsError = 'Server needs to be restarted.'; }
       } catch (e) { hsError = 'Could not reach HubSpot. Check your token or network.'; }
@@ -2923,7 +2959,26 @@ async function renderAdminProjects(container) {
         const coPmUser = deal.coProjectManagerHsId
           ? cachedUsers.find(u => u.hubspotOwnerId && u.hubspotOwnerId === deal.coProjectManagerHsId)
           : null;
-        const assignedTo = coPmUser ? [coPmUser.id] : [];
+
+        // Resolve implementer fields (HubSpot ID or email) to local user IDs
+        function resolveToLocalUser(raw) {
+          if (!raw) return null;
+          return cachedUsers.find(u =>
+            (u.hubspotOwnerId && u.hubspotOwnerId === raw) ||
+            (u.email && u.email.toLowerCase() === raw.toLowerCase())
+          ) || null;
+        }
+        const implUsers = [
+          resolveToLocalUser(deal.hrImplementerRaw),
+          resolveToLocalUser(deal.payrollImplementerRaw),
+          resolveToLocalUser(deal.payrollMasterRaw),
+          resolveToLocalUser(deal.softwareImplementerRaw),
+        ].filter(Boolean);
+
+        const assignedTo = [...new Set([
+          ...(coPmUser ? [coPmUser.id] : []),
+          ...implUsers.map(u => u.id),
+        ])];
         if (!proj) {
           existing.push({
             id:                   `hs_${deal.id}`,
@@ -2945,19 +3000,20 @@ async function renderAdminProjects(container) {
           });
           changed = true;
         } else {
-          // Always update status, PM, and co-PM to stay in sync with HubSpot
-          const newCoPm = deal.coProjectManagerHsId || null;
+          // Always update status, PM, and assignedTo to stay in sync with HubSpot
           const newPmId = matchedUser ? matchedUser.id : (proj.projectManager || null);
-          if (proj.status !== mappedStatus || proj.projectManager !== newPmId || proj.coProjectManagerHsId !== newCoPm || !proj.syncedAt) {
-            proj.status               = mappedStatus;
-            proj.projectManager       = newPmId;
-            proj.coProjectManagerHsId = newCoPm;
-            if (!proj.syncedAt) proj.syncedAt = new Date().toISOString();
-            if (coPmUser && !proj.assignedTo.includes(coPmUser.id)) {
-              proj.assignedTo = [...(proj.assignedTo || []).filter(id => id !== coPmUser.id), coPmUser.id];
-            }
-            changed = true;
-          }
+          // Implementers from HubSpot fields (always recalculate)
+          const hsAssigned = [...new Set(implUsers.map(u => u.id))];
+          // Preserve manually-added team members that aren't HubSpot-driven
+          const manuallyAdded = (proj.assignedTo || []).filter(id =>
+            !hsAssigned.includes(id) && id !== newPmId
+          );
+          const newAssignedTo = [...new Set([...hsAssigned, ...manuallyAdded])];
+          proj.status         = mappedStatus;
+          proj.projectManager = newPmId;
+          if (!proj.syncedAt) proj.syncedAt = new Date().toISOString();
+          proj.assignedTo     = newAssignedTo;
+          changed = true;
         }
       });
       if (changed) saveProjects(existing);
@@ -5304,6 +5360,17 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       </div>` : '';
     const planningRows = buildPlanningRows(timeline, milestones, isReadOnly, pfActivePhases);
 
+    // Timeline versions
+    const versions = p.timelineVersions || [];
+    const versionSelectorHtml = versions.length > 0 ? `
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.6rem;padding:.5rem .85rem;background:#f0fdf4;border-radius:8px;border:1px solid #86efac">
+        <span style="font-size:.78rem;font-weight:700;color:#065f46;white-space:nowrap">&#128203; History:</span>
+        <select id="pf-version-selector" style="flex:1;padding:.3rem .55rem;border:1px solid #86efac;border-radius:6px;font-size:.8rem;background:#fff;color:var(--txt)">
+          <option value="">&#9989; Active (Current)</option>
+          ${[...versions].reverse().map(v => `<option value="${v.id}">v${v.versionNumber} &mdash; ${v.name} (${new Date(v.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})})</option>`).join('')}
+        </select>
+      </div>` : '';
+
     // Documents tab
     const docsHtml = salesDocs.length > 0
       ? `<div style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.75rem">
@@ -5370,12 +5437,13 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       <!-- Timeline Tab -->
       <div id="pf-tab-timeline" style="display:${activeTab === 'timeline' ? 'block' : 'none'}">
         <p style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.9rem">Set target dates per phase. Save first, then download to share with your client.</p>
+        ${versionSelectorHtml}
         ${pfTplSelectorHtml}
         <div id="pf-planning-rows-wrap" style="display:flex;flex-direction:column;gap:.2rem">${planningRows}</div>
         <div class="modal-actions" style="margin-top:1.2rem">
           <button class="btn btn-ghost pf-close-btn">Close</button>
           <button class="btn btn-ghost" id="pf-tl-download-btn">&#11123; Download Timeline</button>
-          ${!isReadOnly ? `<button class="btn btn-primary" id="pf-tl-save-btn">Save Dates</button>` : ''}
+          ${!isReadOnly ? `<button class="btn btn-secondary" id="pf-tl-version-btn" style="background:#f0fdf4;border:1.5px solid #86efac;color:#065f46">&#128203; Save as New Version</button><button class="btn btn-primary" id="pf-tl-save-btn">Save Dates</button>` : ''}
         </div>
       </div>
 
@@ -5587,7 +5655,87 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
         saveProjects(list);
         alert('Target dates saved!');
       });
+
+      // Save as new version
+      modal.querySelector('#pf-tl-version-btn')?.addEventListener('click', () => {
+        const name = prompt('Version name (e.g. "Q1 Revision", "After Kickoff"):')?.trim();
+        if (!name) return;
+        const reason = prompt('Revision reason (required — this will be auto-documented internally):')?.trim();
+        if (!reason) return;
+
+        const newTimeline = collectTimeline();
+        syncTemplateToMilestones(newTimeline, getPfActivePhases());
+
+        const list = getProjects();
+        const idx  = list.findIndex(x => x.id === projectId);
+        if (idx === -1) return;
+        const proj = list[idx];
+
+        if (!proj.timelineVersions) proj.timelineVersions = [];
+        const versionNumber = proj.timelineVersions.length + 1;
+        const oldSnapshot   = { ...(proj.timeline || {}) };
+
+        proj.timelineVersions.push({
+          id:             `tv_${Date.now()}`,
+          versionNumber,
+          name,
+          snapshot:       oldSnapshot,
+          createdAt:      new Date().toISOString(),
+          createdBy:      effectiveUser()?.name || 'Unknown',
+          revisionReason: reason,
+        });
+
+        proj.timeline         = newTimeline;
+        proj.timelineTemplate = modal.querySelector('#pf-tpl-selector')?.value || null;
+
+        // Auto-create internal documentation entry
+        if (!proj.docs) proj.docs = {};
+        const revKey = '_timeline_revisions';
+        if (!proj.docs[revKey]) proj.docs[revKey] = [];
+        proj.docs[revKey].push({
+          id:            `td_${Date.now()}`,
+          html:          `<strong>Timeline Version ${versionNumber}: ${name}</strong><br><em>Reason:</em> ${reason}<br><em>By:</em> ${effectiveUser()?.name || 'Unknown'} &mdash; ${new Date().toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})}`,
+          text:          `Timeline Version ${versionNumber}: ${name}\nReason: ${reason}`,
+          createdAt:     new Date().toISOString(),
+          createdByName: effectiveUser()?.name || 'Unknown',
+          isInternal:    true,
+        });
+
+        saveProjects(list);
+        logAudit('timeline.version_saved', `Saved timeline version "${name}" for "${proj.title}" — Reason: ${reason}`, { projectId });
+        modal.remove();
+        buildModal('timeline');
+      });
     }
+
+    // Version selector — switch between historical snapshots
+    modal.querySelector('#pf-version-selector')?.addEventListener('change', function() {
+      const versionId = this.value;
+      const wrap = modal.querySelector('#pf-planning-rows-wrap');
+      const saveBtn    = modal.querySelector('#pf-tl-save-btn');
+      const verBtn     = modal.querySelector('#pf-tl-version-btn');
+      const tplWrap    = modal.querySelector('#pf-tpl-selector')?.closest('div[style*="Template"]') || null;
+      if (!versionId) {
+        // Active timeline — editable
+        wrap.innerHTML = buildPlanningRows(timeline, milestones, isReadOnly, getPfActivePhases());
+        if (saveBtn) saveBtn.style.display = '';
+        if (verBtn)  verBtn.style.display  = '';
+      } else {
+        const ver = versions.find(v => v.id === versionId);
+        if (!ver) return;
+        // Historical snapshot — read-only
+        wrap.innerHTML = buildPlanningRows(ver.snapshot, milestones, true, getPfActivePhases());
+        // Append reason banner
+        if (ver.revisionReason) {
+          const banner = document.createElement('div');
+          banner.style.cssText = 'font-size:.8rem;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:.45rem .75rem;margin-top:.6rem';
+          banner.innerHTML = `&#128203; <strong>Reason:</strong> ${ver.revisionReason} &mdash; <em>${new Date(ver.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})} by ${ver.createdBy}</em>`;
+          wrap.appendChild(banner);
+        }
+        if (saveBtn) saveBtn.style.display = 'none';
+        if (verBtn)  verBtn.style.display  = 'none';
+      }
+    });
 
     // Documents: add
     modal.querySelector('#pf-add-doc').addEventListener('click', () => {
@@ -8083,6 +8231,7 @@ function renderAccessMatrix(container) {
         { key: 'view_hubspot',     label: 'View HubSpot' },
         { key: 'act_as_user',      label: 'Act As User' },
         { key: 'view_audit_trail', label: 'View Audit Trail' },
+        { key: 'view_tools_hub',   label: 'View Tools Hub' },
       ],
     },
   ];
