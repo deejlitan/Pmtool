@@ -5216,7 +5216,7 @@ function openFilesModal(projectId) {
       if (idx === -1) return;
       if (!list[idx].details) list[idx].details = {};
       if (!list[idx].details.salesDocs) list[idx].details.salesDocs = salesDocs.slice();
-      list[idx].details.salesDocs.push({ id: genId(), name, url });
+      list[idx].details.salesDocs.push({ id: genId(), name, url, addedAt: new Date().toISOString() });
       delete list[idx].details.salesDriveLink;
       saveProjects(list);
       modal.remove();
@@ -5600,7 +5600,7 @@ function openProjectFullModal(projectId, initialTab = 'milestones') {
       if (idx === -1) return;
       if (!list[idx].details) list[idx].details = {};
       if (!list[idx].details.salesDocs) list[idx].details.salesDocs = salesDocs.slice();
-      list[idx].details.salesDocs.push({ id: genId(), name, url });
+      list[idx].details.salesDocs.push({ id: genId(), name, url, addedAt: new Date().toISOString() });
       delete list[idx].details.salesDriveLink;
       saveProjects(list);
       modal.remove();

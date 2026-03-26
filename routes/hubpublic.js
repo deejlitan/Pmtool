@@ -53,53 +53,245 @@ function buildGateHtml(hub, errorMsg) {
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;600;700;800&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Rubik',sans-serif;background:#F7F9ED;min-height:100vh;display:flex;flex-direction:column}
-    h1,h2,h3,h4{font-family:'Fira Sans',sans-serif}
-    header{background:linear-gradient(135deg,#092903 0%,#1a6b08 100%);color:#fff;padding:18px 40px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 16px rgba(9,41,3,.35)}
-    .logo{height:64px;width:auto;object-fit:contain;flex-shrink:0}
-    .header-text p{font-size:.85rem;opacity:.75;margin-top:2px}
-    .gate-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
-    .gate-box{background:#fff;border-radius:18px;padding:44px 40px;max-width:440px;width:100%;box-shadow:0 8px 32px rgba(9,41,3,.12);text-align:center}
-    .gate-icon{font-size:2.8rem;margin-bottom:16px}
-    .gate-box h2{font-size:1.35rem;font-weight:800;color:#092903;margin-bottom:8px}
-    .gate-box p{font-size:.9rem;color:#5a7a5a;line-height:1.55;margin-bottom:24px}
-    .gate-input{width:100%;padding:12px 16px;border:1.5px solid #c0d8ba;border-radius:10px;font-size:.95rem;font-family:'Rubik',sans-serif;outline:none;margin-bottom:14px;transition:border .2s,box-shadow .2s}
-    .gate-input:focus{border-color:#32CE13;box-shadow:0 0 0 3px rgba(50,206,19,.15)}
-    .gate-btn{width:100%;padding:13px;background:#092903;color:#32CE13;border:none;border-radius:10px;font-family:'Fira Sans',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;transition:background .2s}
-    .gate-btn:hover{background:#1a6b08}
-    .gate-btn:disabled{opacity:.6;cursor:not-allowed}
-    .gate-error{color:#dc3545;font-size:.85rem;margin-top:10px;padding:10px 14px;background:#fff5f5;border:1px solid #f5c2c7;border-radius:8px;${errorMsg?'':'display:none'}}
-    .gate-hint{font-size:.75rem;color:#8aaa8a;margin-top:6px;margin-bottom:18px}
-    footer{text-align:center;padding:20px;font-size:.78rem;color:#8aaa8a;border-top:1px solid #d4e8d0}
-    .footer-brand{color:#32CE13;font-family:'Fira Sans',sans-serif;font-weight:800}
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box }
+
+    body {
+      font-family: 'Rubik', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 20% 50%, #0d3d06 0%, #061a02 45%, #020d01 100%);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient glow orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+    }
+    .orb-green1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, #32CE13, transparent 70%);
+      opacity: 0.2;
+      top: -150px; left: -150px;
+      animation: drift1 3s ease-in-out infinite alternate;
+    }
+    .orb-green2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, #1a6b08, transparent 70%);
+      opacity: 0.22;
+      bottom: -120px; right: -100px;
+      animation: drift2 2.5s ease-in-out infinite alternate;
+    }
+    .orb-white {
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+      opacity: 0.06;
+      top: 40%; left: 55%;
+      animation: drift3 2s ease-in-out infinite alternate;
+    }
+
+    /* Subtle grid texture overlay */
+    .bg-grid {
+      position: fixed; inset: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(50,206,19,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(50,206,19,.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(100px, 120px) scale(1.2); } }
+    @keyframes drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-90px,-100px) scale(1.15); } }
+    @keyframes drift3 { from { transform: translate(0,0) scale(1); } to { transform: translate(-80px, 60px) scale(1.1); } }
+
+    /* Card */
+    .gate-wrap {
+      position: relative; z-index: 10;
+      width: 100%; max-width: 460px;
+      padding: 20px;
+    }
+
+    .gate-box {
+      background: linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(50,206,19,0.2);
+      border-radius: 24px;
+      padding: 48px 44px 44px;
+      box-shadow:
+        0 0 0 1px rgba(50,206,19,0.05),
+        0 32px 64px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      animation: cardIn .5s cubic-bezier(.22,1,.36,1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity:0; transform: translateY(24px) scale(.97); }
+      to   { opacity:1; transform: translateY(0) scale(1); }
+    }
+
+    /* Logo area */
+    .gate-logo-wrap {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .gate-logo {
+      height: 80px;
+      width: auto;
+      filter: brightness(0) invert(1);
+      opacity: .9;
+    }
+    .gate-divider {
+      width: 40px; height: 2px;
+      background: linear-gradient(90deg, transparent, #32CE13, transparent);
+      margin: 16px auto 0;
+      border-radius: 2px;
+    }
+
+    /* Lock badge */
+    .gate-badge {
+      display: flex; align-items: center; justify-content: center;
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, rgba(50,206,19,.15), rgba(50,206,19,.05));
+      border: 1px solid rgba(50,206,19,.3);
+      border-radius: 16px;
+      margin: 0 auto 20px;
+      font-size: 1.6rem;
+      box-shadow: 0 0 20px rgba(50,206,19,.15);
+    }
+
+    .gate-title {
+      font-family: 'Fira Sans', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 8px;
+      letter-spacing: -.01em;
+    }
+    .gate-subtitle {
+      font-size: .875rem;
+      color: rgba(255,255,255,.45);
+      text-align: center;
+      line-height: 1.55;
+      margin-bottom: 32px;
+    }
+
+    /* Form */
+    .gate-field { margin-bottom: 16px; }
+    .gate-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 7px;
+    }
+    .gate-label span { font-weight: 400; text-transform: none; letter-spacing: 0; color: rgba(255,255,255,.3); }
+
+    .gate-input {
+      width: 100%;
+      padding: 13px 16px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      font-size: .95rem;
+      font-family: 'Rubik', sans-serif;
+      color: #fff;
+      outline: none;
+      transition: border .2s, box-shadow .2s, background .2s;
+    }
+    .gate-input::placeholder { color: rgba(255,255,255,.25); }
+    .gate-input:focus {
+      border-color: rgba(50,206,19,.6);
+      background: rgba(50,206,19,.06);
+      box-shadow: 0 0 0 3px rgba(50,206,19,.12), 0 0 16px rgba(50,206,19,.08);
+    }
+
+    .gate-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 14px;
+      background: linear-gradient(135deg, #32CE13 0%, #28a80f 100%);
+      color: #061a02;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Fira Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: .01em;
+      box-shadow: 0 4px 20px rgba(50,206,19,.35), 0 1px 0 rgba(255,255,255,.2) inset;
+      transition: transform .15s, box-shadow .15s, background .2s;
+    }
+    .gate-btn:hover {
+      background: linear-gradient(135deg, #3de01e 0%, #32CE13 100%);
+      box-shadow: 0 6px 28px rgba(50,206,19,.5);
+      transform: translateY(-1px);
+    }
+    .gate-btn:active { transform: translateY(0); }
+    .gate-btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+
+    .gate-error {
+      margin-top: 14px;
+      font-size: .83rem;
+      color: #ff8080;
+      background: rgba(220,53,69,.12);
+      border: 1px solid rgba(220,53,69,.3);
+      border-radius: 10px;
+      padding: 10px 14px;
+      text-align: center;
+      ${errorMsg ? '' : 'display:none'}
+    }
+
+    /* Footer */
+    .gate-footer {
+      text-align: center;
+      margin-top: 28px;
+      font-size: .75rem;
+      color: rgba(255,255,255,.2);
+      letter-spacing: .02em;
+    }
+    .gate-footer strong { color: rgba(50,206,19,.5); font-family: 'Fira Sans', sans-serif; }
   </style>
 </head>
 <body>
-<header>
-  <img class="logo" src="/Sprout%20Logo.png" alt="Sprout Solutions" />
-  <div class="header-text">
-    <p>Implementation Resource Hub</p>
-  </div>
-</header>
+<div class="bg-grid"></div>
+<div class="orb orb-green1"></div>
+<div class="orb orb-green2"></div>
+<div class="orb orb-white"></div>
 
 <div class="gate-wrap">
   <div class="gate-box">
-    <div class="gate-icon">🔒</div>
-    <h2>${escHtml(hub.projectTitle)}</h2>
-    <p>This resource hub is private. Enter your credentials to verify access.</p>
-    <label class="gate-label" for="gateEmail">Email Address</label>
-    <input class="gate-input" type="email" id="gateEmail" placeholder="your@email.com" />
-    <label class="gate-label" for="gatePassword">Password <span style="font-weight:400;color:#8aaa8a">(if provided by your project team)</span></label>
-    <input class="gate-input" type="password" id="gatePassword" placeholder="Leave blank if no password was set" />
+
+    <div class="gate-logo-wrap">
+      <img class="gate-logo" src="/Sprout%20Logo.png" alt="Sprout Solutions" />
+      <div class="gate-divider"></div>
+    </div>
+
+    <div class="gate-badge">🔒</div>
+    <h2 class="gate-title">${escHtml(hub.projectTitle)}</h2>
+    <p class="gate-subtitle">This resource hub is private. Enter your credentials to verify access.</p>
+
+    <div class="gate-field">
+      <label class="gate-label" for="gateEmail">Email Address</label>
+      <input class="gate-input" type="email" id="gateEmail" placeholder="your@email.com" />
+    </div>
+    <div class="gate-field">
+      <label class="gate-label" for="gatePassword">Password <span>(if provided by your project team)</span></label>
+      <input class="gate-input" type="password" id="gatePassword" placeholder="Leave blank if no password was set" />
+    </div>
     <button class="gate-btn" id="gateBtn" onclick="verifyAccess()">Access Resource Hub →</button>
     <div class="gate-error" id="gateError">${errorMsg ? escHtml(errorMsg) : ''}</div>
-  </div>
-</div>
 
-<footer>
-  <span class="footer-brand">Sprout Solutions</span> &mdash; Implementation Resource Hub
-</footer>
+  </div>
+  <div class="gate-footer"><strong>Sprout Solutions</strong> &mdash; Implementation Resource Hub</div>
+</div>
 
 <script>
   document.getElementById('gatePassword').addEventListener('keydown', function(e) {
@@ -216,10 +408,13 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
   const contacts   = details.contacts    || [];
   const recordings = hub.recordings      || [];
 
-  const completedCount = MILESTONES.filter(m => milestones[m]).length;
+  // Use project's actual milestone list (from Kanban columns) instead of hardcoded list
+  const projectMilestones = Object.keys(milestones).length > 0 ? Object.keys(milestones) : MILESTONES;
+
+  const completedCount = projectMilestones.filter(m => milestones[m]).length;
   const inProgressCount = 1; // always 1 "in progress" unless all done
-  const pendingCount   = Math.max(0, MILESTONES.length - completedCount - (completedCount < MILESTONES.length ? 1 : 0));
-  const progress       = MILESTONES.length ? Math.round((completedCount / MILESTONES.length) * 100) : 0;
+  const pendingCount   = Math.max(0, projectMilestones.length - completedCount - (completedCount < projectMilestones.length ? 1 : 0));
+  const progress       = projectMilestones.length ? Math.round((completedCount / projectMilestones.length) * 100) : 0;
   const serverToday    = new Date().toISOString().split('T')[0];
 
   const allUsers = getUsers();
@@ -235,9 +430,9 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
     </div>` : '';
 
   // ── Zigzag milestone timeline ──
-  const msZigzag = MILESTONES.map((m, i) => {
+  const msZigzag = projectMilestones.map((m, i) => {
     const done      = !!milestones[m];
-    const isCurrent = !done && MILESTONES.slice(0, i).every(prev => milestones[prev]);
+    const isCurrent = !done && projectMilestones.slice(0, i).every(prev => milestones[prev]);
     const targetStart = timeline[m]?.startDate;
     const targetEnd   = timeline[m]?.endDate || timeline[m]?.targetDate;
     const actual      = timeline[m]?.actualDate || (done ? serverToday : '');
@@ -261,13 +456,13 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
         <div style="margin-top:8px">${badge}</div>
       </div>`;
     return `
-      <div style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:center;position:relative;min-height:80px">
+      <div class="ms-row" style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:center;position:relative;min-height:80px;animation-delay:${i * 0.12}s">
         <div>${isLeft ? card : ''}</div>
         <div style="display:flex;flex-direction:column;align-items:center;z-index:1">
           <div style="width:36px;height:36px;border-radius:50%;background:${dotColor};color:#fff;font-family:'Fira Sans',sans-serif;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px ${done?'#d1fae5':isCurrent?'#fef3c7':'#f3f4f6'};${isCurrent?'animation:pulse-dot 2s infinite':''}">
             ${dotIcon}
           </div>
-          ${i < MILESTONES.length - 1 ? `<div style="width:2px;height:32px;background:${done?'#86efac':'#e4ece4'};margin-top:2px"></div>` : ''}
+          ${i < projectMilestones.length - 1 ? `<div style="width:2px;height:32px;background:${done?'#86efac':'#e4ece4'};margin-top:2px"></div>` : ''}
         </div>
         <div>${!isLeft ? card : ''}</div>
       </div>`;
@@ -284,6 +479,7 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
             <li><a href="${escHtml(d.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;text-decoration:none;color:#1a6b08;font-weight:500;font-size:.9rem;border:1px solid #e4ece4;transition:background .15s" onmouseover="this.style.background='#eafce6'" onmouseout="this.style.background=''">
               <span style="font-size:1.1rem">📎</span>
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(d.name||d.url)}</span>
+              ${d.addedAt ? `<span style="font-size:.78rem;color:#9ab09a;white-space:nowrap;flex-shrink:0">${fmtDate(d.addedAt)}</span>` : ''}
               <span style="font-size:.85rem;color:#9ab09a">↗</span>
             </a></li>`).join('')}</ul>`}
       </div>
@@ -377,7 +573,35 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
 
     /* ── Stat tiles ── */
     .stat-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
-    .stat-tile{border-radius:14px;padding:20px 22px;color:#fff;position:relative;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+    .stat-tile{
+      border-radius:14px;padding:20px 22px;color:#fff;position:relative;overflow:hidden;
+      box-shadow:0 4px 14px rgba(0,0,0,.12);
+      opacity:0;
+      transition:transform .2s ease,box-shadow .2s ease;
+    }
+    .stat-tile:hover{transform:translateY(-5px) scale(1.02);box-shadow:0 12px 32px rgba(0,0,0,.22)}
+
+    /* Mirror shine sweep */
+    .stat-tile::after{
+      content:'';
+      position:absolute;
+      top:-60%;left:-80%;
+      width:50%;height:220%;
+      background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%);
+      transform:skewX(-10deg);
+      animation:shineSweep 3.5s ease-in-out infinite;
+    }
+    .stat-tile:nth-child(2)::after{animation-delay:.4s}
+    .stat-tile:nth-child(3)::after{animation-delay:.8s}
+    .stat-tile:nth-child(4)::after{animation-delay:1.2s}
+    @keyframes shineSweep{0%,60%,100%{left:-80%}30%{left:130%}}
+
+    /* Slide-in alternating left/right */
+    @keyframes tileInLeft{from{opacity:0;transform:translateX(-40px) scale(.96)}to{opacity:1;transform:translateX(0) scale(1)}}
+    @keyframes tileInRight{from{opacity:0;transform:translateX(40px) scale(.96)}to{opacity:1;transform:translateX(0) scale(1)}}
+    .stat-tile.tile-animate-left{animation:tileInLeft .55s cubic-bezier(.22,1,.36,1) forwards}
+    .stat-tile.tile-animate-right{animation:tileInRight .55s cubic-bezier(.22,1,.36,1) forwards}
+
     .stat-tile-icon{position:absolute;right:16px;top:14px;font-size:2rem;opacity:.22}
     .stat-tile-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;opacity:.85;margin-bottom:6px}
     .stat-tile-value{font-size:1.5rem;font-weight:800;line-height:1;font-family:'Fira Sans',sans-serif}
@@ -402,6 +626,8 @@ function buildHubHtml(hub, project, accessLevel, isInternalUser) {
     @keyframes pulse-dot{0%,100%{box-shadow:0 0 0 4px #fef3c7}50%{box-shadow:0 0 0 8px #fef9c3}}
     @keyframes pulse-badge{0%,100%{opacity:1}50%{opacity:.7}}
     @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes milestoneIn{from{opacity:0;transform:translateY(-28px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .ms-row{opacity:0;animation:milestoneIn .45s cubic-bezier(.22,1,.36,1) forwards}
     .hub-main>*{animation:fadeInUp .4s ease both}
     .hub-main>*:nth-child(1){animation-delay:.05s}
     .hub-main>*:nth-child(2){animation-delay:.1s}
@@ -455,25 +681,25 @@ ${adminBanner}
 
   <!-- ── Stat Tiles ── -->
   <div class="stat-tiles" id="overview">
-    <div class="stat-tile" style="background:linear-gradient(135deg,#16a34a,#15803d)">
+    <div class="stat-tile tile-animate-left" style="background:linear-gradient(135deg,#16a34a,#15803d);animation-delay:.05s">
       <div class="stat-tile-icon">📊</div>
       <div class="stat-tile-label">Overall Progress</div>
-      <div class="stat-tile-value">${progress}%</div>
-      <div class="stat-tile-sub">${completedCount} of ${MILESTONES.length} milestones done</div>
+      <div class="stat-tile-value" id="tile-progress">0%</div>
+      <div class="stat-tile-sub">${completedCount} of ${projectMilestones.length} milestones done</div>
     </div>
-    <div class="stat-tile" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+    <div class="stat-tile tile-animate-left" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);animation-delay:.18s">
       <div class="stat-tile-icon">👤</div>
       <div class="stat-tile-label">Project Manager</div>
       <div class="stat-tile-value" style="font-size:1.05rem;line-height:1.3">${escHtml(pm?.name||'—')}</div>
       <div class="stat-tile-sub">${pm?.email ? escHtml(pm.email) : 'Sprout Solutions'}</div>
     </div>
-    <div class="stat-tile" style="background:linear-gradient(135deg,#0891b2,#0e7490)">
+    <div class="stat-tile tile-animate-right" style="background:linear-gradient(135deg,#0891b2,#0e7490);animation-delay:.31s">
       <div class="stat-tile-icon">🏁</div>
       <div class="stat-tile-label">Milestones Done</div>
-      <div class="stat-tile-value">${completedCount} <span style="font-size:1rem;opacity:.7">/ ${MILESTONES.length}</span></div>
+      <div class="stat-tile-value"><span id="tile-ms-done">0</span> <span style="font-size:1rem;opacity:.7">/ ${projectMilestones.length}</span></div>
       <div class="stat-tile-sub">${pendingCount} remaining</div>
     </div>
-    <div class="stat-tile" style="background:linear-gradient(135deg,#d97706,#b45309)">
+    <div class="stat-tile tile-animate-right" style="background:linear-gradient(135deg,#d97706,#b45309);animation-delay:.44s">
       <div class="stat-tile-icon">📌</div>
       <div class="stat-tile-label">Project Status</div>
       <div class="stat-tile-value" style="font-size:1.1rem;text-transform:capitalize">${statusLabel(project?.status)}</div>
@@ -501,13 +727,13 @@ ${adminBanner}
         <div style="position:relative;height:220px;display:flex;align-items:center;justify-content:center">
           <canvas id="hub-donut-chart"></canvas>
           <div class="donut-center">
-            <div class="donut-pct">${progress}%</div>
+            <div class="donut-pct" id="hub-donut-center">0%</div>
             <div class="donut-lbl">Complete</div>
           </div>
         </div>
         <div style="display:flex;justify-content:center;gap:16px;margin-top:12px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block"></span>Done (${completedCount})</div>
-          <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block"></span>In Progress (${completedCount < MILESTONES.length ? 1 : 0})</div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block"></span>In Progress (${completedCount < projectMilestones.length ? 1 : 0})</div>
           <div style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#5a7a5a"><span style="width:10px;height:10px;border-radius:50%;background:#e5e7eb;display:inline-block"></span>Pending (${pendingCount})</div>
         </div>
       </div>
@@ -515,9 +741,9 @@ ${adminBanner}
       <!-- Mini stat card -->
       <div class="chart-card">
         <div class="chart-card-title">Timeline Summary</div>
-        ${MILESTONES.map((m, i) => {
+        ${projectMilestones.map((m, i) => {
           const done = !!milestones[m];
-          const isCur = !done && MILESTONES.slice(0,i).every(p=>milestones[p]);
+          const isCur = !done && projectMilestones.slice(0,i).every(p=>milestones[p]);
           const tStart = timeline[m]?.startDate;
           const tEnd   = timeline[m]?.endDate || timeline[m]?.targetDate;
           if (!done && !isCur) return '';
@@ -549,13 +775,36 @@ ${adminBanner}
 </footer>
 
 <script>
+  // ── Tile count-up ──
+  (function() {
+    function countUp(elId, target, suffix, duration) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      let start = 0;
+      const step = target / (duration / 16);
+      const timer = setInterval(() => {
+        start = Math.min(start + step, target);
+        el.textContent = Math.round(start) + (suffix || '');
+        if (start >= target) clearInterval(timer);
+      }, 16);
+    }
+    setTimeout(() => {
+      countUp('tile-progress', ${progress}, '%', 900);
+      countUp('tile-ms-done', ${completedCount}, '', 900);
+    }, 300);
+  })();
+
   // ── Donut chart ──
   (function() {
     const ctx = document.getElementById('hub-donut-chart');
     if (!ctx) return;
     const done    = ${completedCount};
-    const inProg  = ${completedCount < MILESTONES.length ? 1 : 0};
+    const inProg  = ${completedCount < projectMilestones.length ? 1 : 0};
     const pending = ${pendingCount};
+    const total = done + inProg + pending;
+    const targetPct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const centerLabel = document.getElementById('hub-donut-center');
+
     new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -565,7 +814,7 @@ ${adminBanner}
           backgroundColor: ['#16a34a', '#d97706', '#e5e7eb'],
           borderWidth: 3,
           borderColor: '#fff',
-          hoverOffset: 6,
+          hoverOffset: 8,
         }],
       },
       options: {
@@ -580,7 +829,20 @@ ${adminBanner}
             },
           },
         },
-        animation: { animateRotate: true, duration: 900 },
+        animation: {
+          animateRotate: true,
+          animateScale: true,
+          duration: 1400,
+          easing: 'easeInOutQuart',
+          onProgress: function(anim) {
+            if (!centerLabel) return;
+            const current = Math.round(targetPct * anim.currentStep / anim.numSteps);
+            centerLabel.textContent = current + '%';
+          },
+          onComplete: function() {
+            if (centerLabel) centerLabel.textContent = targetPct + '%';
+          },
+        },
       },
     });
   })();
