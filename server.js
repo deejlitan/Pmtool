@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
+const session = require('cookie-session');
 const path    = require('path');
 
 const app  = express();
@@ -11,14 +11,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(session({
-  secret:            process.env.SESSION_SECRET || 'sprout-pmt-secret',
-  resave:            false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure:   false, // set to true if serving over HTTPS
-    maxAge:   24 * 60 * 60 * 1000, // 24 hours
-  },
+  name:   'sprout-pmt',
+  secret: process.env.SESSION_SECRET || 'sprout-pmt-secret',
+  maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  httpOnly: true,
+  secure:   process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
 }));
 
 // API routes

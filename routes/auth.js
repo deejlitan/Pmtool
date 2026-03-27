@@ -53,7 +53,7 @@ router.post('/logout', (req, res) => {
       meta:      {},
     });
   }
-  req.session.destroy();
+  req.session = null;
   res.json({ ok: true });
 });
 
