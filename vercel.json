@@ -4,12 +4,25 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "style.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "app.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.png",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "server.js"
-    }
+    { "src": "/style.css(.*)", "dest": "/style.css" },
+    { "src": "/app.js(.*)", "dest": "/app.js" },
+    { "src": "/Sprout Logo.png", "dest": "/Sprout Logo.png" },
+    { "src": "/Sidekick.png", "dest": "/Sidekick.png" },
+    { "src": "/(.*)", "dest": "server.js" }
   ]
 }
