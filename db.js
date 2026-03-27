@@ -118,7 +118,11 @@ const DEFAULT_PERMISSIONS = {
   },
 };
 
+// In-memory fallback for read-only environments (e.g. Vercel)
+let _usersMemory = null;
+
 function getUsers() {
+  if (_usersMemory !== null) return _usersMemory;
   if (!fs.existsSync(FILE)) return [];
   try {
     return JSON.parse(fs.readFileSync(FILE, 'utf8'));
@@ -128,7 +132,12 @@ function getUsers() {
 }
 
 function saveUsers(users) {
-  fs.writeFileSync(FILE, JSON.stringify(users, null, 2), 'utf8');
+  try {
+    fs.writeFileSync(FILE, JSON.stringify(users, null, 2), 'utf8');
+  } catch {
+    // Filesystem is read-only (e.g. Vercel) — keep in memory
+    _usersMemory = users;
+  }
 }
 
 function getPermissions() {
@@ -297,6 +306,7 @@ if (getUsers().length === 0) {
     { id: 'u2', username: 'john',  passwordHash: bcrypt.hashSync('user123',  10), name: 'John Doe',    email: '', role: 'project_manager', color: '#10b981', resetToken: null, resetExpires: null },
     { id: 'u3', username: 'jane',  passwordHash: bcrypt.hashSync('user456',  10), name: 'Jane Smith',  email: '', role: 'project_manager', color: '#f59e0b', resetToken: null, resetExpires: null },
   ];
+  _usersMemory = seeds;
   saveUsers(seeds);
   console.log('  Database seeded with default users.');
 }
