@@ -6,11 +6,12 @@ const fs     = require('fs');
 const path   = require('path');
 const bcrypt = require('bcryptjs');
 
-const FILE             = path.join(__dirname, 'pmt-users.json');
-const PERMISSIONS_FILE = path.join(__dirname, 'pmt-permissions.json');
-const ROLES_FILE       = path.join(__dirname, 'pmt-roles.json');
-const AUDIT_FILE       = path.join(__dirname, 'pmt-audit.json');
-const SETTINGS_FILE    = path.join(__dirname, 'pmt-settings.json');
+const DATA_DIR         = process.env.DATA_DIR || __dirname;
+const FILE             = path.join(DATA_DIR, 'pmt-users.json');
+const PERMISSIONS_FILE = path.join(DATA_DIR, 'pmt-permissions.json');
+const ROLES_FILE       = path.join(DATA_DIR, 'pmt-roles.json');
+const AUDIT_FILE       = path.join(DATA_DIR, 'pmt-audit.json');
+const SETTINGS_FILE    = path.join(DATA_DIR, 'pmt-settings.json');
 
 const DEFAULT_ROLES = [
   { id: 'super_admin',     label: 'Super Admin',    system: true },
@@ -212,11 +213,11 @@ function saveSettings(s) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2), 'utf8');
 }
 
-const PROJECTS_FILE     = path.join(__dirname, 'pmt-projects.json');
-const TOOLS_FILE        = path.join(__dirname, 'pmt-tools.json');
-const INTEGRATIONS_FILE = path.join(__dirname, 'pmt-integrations.json');
-const HUBS_FILE         = path.join(__dirname, 'pmt-resource-hubs.json');
-const TEMPLATES_FILE    = path.join(__dirname, 'pmt-timeline-templates.json');
+const PROJECTS_FILE     = path.join(DATA_DIR, 'pmt-projects.json');
+const TOOLS_FILE        = path.join(DATA_DIR, 'pmt-tools.json');
+const INTEGRATIONS_FILE = path.join(DATA_DIR, 'pmt-integrations.json');
+const HUBS_FILE         = path.join(DATA_DIR, 'pmt-resource-hubs.json');
+const TEMPLATES_FILE    = path.join(DATA_DIR, 'pmt-timeline-templates.json');
 
 const DEFAULT_INTEGRATIONS = {
   connectors: [
@@ -276,7 +277,7 @@ function saveIntegrations(data) {
   fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
-const ANNOUNCEMENTS_FILE = path.join(__dirname, 'pmt-announcements.json');
+const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, 'pmt-announcements.json');
 
 function getAnnouncements() {
   if (!fs.existsSync(ANNOUNCEMENTS_FILE)) return [];
